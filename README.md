@@ -1,8 +1,11 @@
 # emotion_manipulation
 
 Download the images from there https://github.com/cs-chan/ArtGAN/tree/master/WikiArt%20Dataset
+
 If you need to write any code to process the data once, include this in the repo.
+
 You can find the annotations in matrix: /projects/katefgroup/language_grounding/artemis_dataset_release_v0.csv
+
 Copy it in your local path and create a new shared folder for our project (where you should also store the images).
 
 Known issues and things to do:
