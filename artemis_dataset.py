@@ -2,6 +2,7 @@
 
 import csv
 import os
+from unicodedata import normalize
 
 import numpy as np
 from PIL import Image
@@ -10,6 +11,7 @@ from torchvision import transforms
 
 import ipdb
 st = ipdb.set_trace
+
 
 class ArtEmisDataset(Dataset):
     """
@@ -37,7 +39,9 @@ class ArtEmisDataset(Dataset):
             annos = [
                 {
                     'art_style': line[names2id['art_style']],
-                    'painting': line[names2id['painting']],
+                    'painting': normalize(
+                        'NFD', line[names2id['painting']]
+                        ).encode('ascii', 'ignore').decode("utf-8"),
                     'emotion': line[names2id['emotion']],
                     'utterance': line[names2id['utterance']]
                 }
@@ -78,7 +82,6 @@ class ArtEmisDataset(Dataset):
         size = 224
         if self.split == 'train':
             preprocessing = transforms.Compose([
-                #transforms.RandomGrayscale(0.15),
                 transforms.RandomHorizontalFlip(0.5),
                 transforms.RandomRotation(20),
                 transforms.RandomPerspective(0.1, 0.5),
@@ -139,8 +142,6 @@ class ArtEmisImageDataset(ArtEmisDataset):
                 }
             per_img[anno['painting']]['emotion'].add(anno['emotion'])
             per_img[anno['painting']]['utterance'].add(anno['utterance'])
-            #if "georges-lacombe" in  per_img[anno['painting']]['painting']:
-            #    st()
         return per_img
 
     def __getitem__(self, index):

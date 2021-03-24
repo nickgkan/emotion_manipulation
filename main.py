@@ -4,16 +4,17 @@ import argparse
 import os
 import os.path as osp
 
+import numpy as np
 import pkbar
 import torch
 from torch.nn import functional as F
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from artemis_dataset import ArtEmisImageDataset
-# from src.tools.early_stopping_scheduler import EarlyStopping
 from early_stopping_scheduler import EarlyStopping
-
+from metrics import compute_ap
 from models.resnet_classifier import ResNetClassifier
 
 
@@ -39,6 +40,7 @@ def train_classifier(model, data_loaders, args):
         is_trained = checkpoint["is_trained"]
     if is_trained:
         return model
+    writer = SummaryWriter('runs/' + args.checkpoint.replace('.pt', ''))
 
     # Training loop
     for epoch in range(start_epoch, args.epochs):
@@ -54,9 +56,17 @@ def train_classifier(model, data_loaders, args):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            writer.add_scalar(
+                'loss', loss.item(),
+                epoch * len(data_loaders['train']) + step
+            )
+        writer.add_scalar(
+            'lr', optimizer.state_dict()['param_groups'][0]['lr'], epoch
+        )
         # Evaluation and model storing
         print("\nValidation")
         acc = eval_classifier(model, data_loaders['test'], args)
+        writer.add_scalar('mAP', acc, epoch)
         improved, ret_epoch, keep_training = scheduler.step(acc)
         if ret_epoch < epoch:
             scheduler.reduce_lr()
@@ -86,19 +96,17 @@ def eval_classifier(model, data_loader, args):
     model.eval()
     device = args.device
     kbar = pkbar.Kbar(target=len(data_loader), width=25)
-    num_correct = 0
-    num_examples = 0
+    gt = []
+    pred = []
     for step, ex in enumerate(data_loader):
         images, _, emotions = ex
-        logits = model(images.to(device))
-        # this is not a correct metric, re-implement better
-        logits = logits.argmax(1).cpu()
-        num_correct += (logits == emotions.argmax(1)).sum()
-        num_examples += len(logits)
-        kbar.update(step, [("accuracy", num_correct / num_examples)])
+        pred.append(torch.sigmoid(model(images.to(device))).cpu().numpy())
+        gt.append(emotions.cpu().numpy())
+        kbar.update(step)
+    AP = compute_ap(np.concatenate(gt), np.concatenate(pred))
 
-    print(f"\nAccuracy: {num_correct / num_examples}")
-    return num_correct / num_examples
+    print(f"\nAccuracy: {np.mean(AP)}")
+    return np.mean(AP)
 
 
 def main():
