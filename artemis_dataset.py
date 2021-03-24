@@ -8,6 +8,8 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+import ipdb
+st = ipdb.set_trace
 
 class ArtEmisDataset(Dataset):
     """
@@ -52,7 +54,6 @@ class ArtEmisDataset(Dataset):
             {emotion: e for e, emotion in enumerate(emotions)}
         )
 
-    @staticmethod
     def _sample_split_indices(self, len_inds, split, seed):
         np.random.seed(seed)
         inds = np.random.permutation(np.arange(len_inds))
@@ -77,7 +78,7 @@ class ArtEmisDataset(Dataset):
         size = 224
         if self.split == 'train':
             preprocessing = transforms.Compose([
-                transforms.RandomGrayscale(0.15),
+                #transforms.RandomGrayscale(0.15),
                 transforms.RandomHorizontalFlip(0.5),
                 transforms.RandomRotation(20),
                 transforms.RandomPerspective(0.1, 0.5),
@@ -138,15 +139,17 @@ class ArtEmisImageDataset(ArtEmisDataset):
                 }
             per_img[anno['painting']]['emotion'].add(anno['emotion'])
             per_img[anno['painting']]['utterance'].add(anno['utterance'])
+            #if "georges-lacombe" in  per_img[anno['painting']]['painting']:
+            #    st()
         return per_img
 
     def __getitem__(self, index):
         """Return a sample to form batch."""
         anno = self.annos[index]
         # Load image
-        img = self._load_image(anno['painting'])
+        img = self._load_image("{0}/{1}.jpg".format(anno['art_style'], anno['painting']))
         # Art-style to index
-        style = self.styles(anno['art_style'])
+        style = self.styles[anno['art_style']]
         # Emotions to index
         emotions = np.zeros((len(self.emotions),))
         for emotion in anno['emotion']:

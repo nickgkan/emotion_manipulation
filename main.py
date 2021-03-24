@@ -11,7 +11,10 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from artemis_dataset import ArtEmisImageDataset
-from src.tools.early_stopping_scheduler import EarlyStopping
+# from src.tools.early_stopping_scheduler import EarlyStopping
+from early_stopping_scheduler import EarlyStopping
+
+from models.resnet_classifier import ResNetClassifier
 
 
 def train_classifier(model, data_loaders, args):
@@ -38,8 +41,8 @@ def train_classifier(model, data_loaders, args):
         return model
 
     # Training loop
-    for epoch in range(start_epoch, args.classifier_epochs):
-        print("Epoch: %d/%d" % (epoch + 1, args.classifier_epochs))
+    for epoch in range(start_epoch, args.epochs):
+        print("Epoch: %d/%d" % (epoch + 1, args.epochs))
         kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
         model.train()
         for step, ex in enumerate(data_loaders['train']):
@@ -101,6 +104,7 @@ def eval_classifier(model, data_loader, args):
 def main():
     """Run main training/test pipeline."""
     data_path = "/projects/katefgroup/language_grounding/"
+    data_path = "/projects/katefgroup/viewpredseg/art/"
     if not osp.exists(data_path):
         data_path = 'data/'  # or change this if you work locally
 
@@ -135,7 +139,7 @@ def main():
     }
 
     # Train classifier
-    model = IMPLEMENT_ME
+    model = ResNetClassifier(num_classes=8, pretrained=True, layers=50)
     model = train_classifier(model.to(args.device), data_loaders, args)
     eval_classifier(model, data_loaders['test'], args)
 
