@@ -32,7 +32,7 @@ def resize_images(im_path):
             _img = _img.resize((int(width * scale), int(height * scale)))
             # Rename
             end = name.split('.')[-1]
-            name = name.replace(end, '_resize' + end)
+            name = name.replace(end, '_resize.' + end)
             _img.save(name)
 
 
