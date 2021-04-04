@@ -4,6 +4,7 @@ import argparse
 import os
 
 from PIL import Image
+from tqdm import tqdm
 
 
 def rename_images(im_path):
@@ -23,7 +24,7 @@ def rename_images(im_path):
 def resize_images(im_path):
     """Resize images to a fixed size."""
     for subfolder in os.listdir(im_path):
-        for name in os.listdir(os.path.join(im_path, subfolder)):
+        for name in tqdm(os.listdir(os.path.join(im_path, subfolder))):
             name = os.path.join(im_path, subfolder, name)
             _img = Image.open(name)
             width, height = _img.size
