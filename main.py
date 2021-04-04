@@ -119,7 +119,7 @@ def main():
     # Parse arguments
     argparser = argparse.ArgumentParser()
     argparser.add_argument(
-        "--im_path", default=osp.join(data_path, "images/")
+        "--im_path", default=osp.join(data_path, "wikiart/")
     )
     argparser.add_argument(
         "--checkpoint_path", default=osp.join(data_path, "checkpoints/")
