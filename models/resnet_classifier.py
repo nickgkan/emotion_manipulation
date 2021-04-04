@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
-import torch.utils.model_zoo as model_zoo
 
 from torchvision import models
 
+
 class ResNetClassifier(nn.Module):
+
     def __init__(self, num_classes=8, pretrained=True, layers=50):
         super(ResNetClassifier, self).__init__()
         self.num_classes = num_classes
@@ -23,4 +24,5 @@ class ResNetClassifier(nn.Module):
         self.net.fc = nn.Linear(self.net.fc.in_features, self.num_classes)
 
     def forward(self, x):
+        """Forward pass for an input image (B, 3, 224, 224)."""
         return self.net(x)

@@ -147,7 +147,7 @@ def main():
     }
 
     # Train classifier
-    model = ResNetClassifier(num_classes=8, pretrained=True, layers=50)
+    model = ResNetClassifier(num_classes=9, pretrained=True, layers=34)
     model = train_classifier(model.to(args.device), data_loaders, args)
     eval_classifier(model, data_loaders['test'], args)
 
