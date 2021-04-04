@@ -2,7 +2,6 @@
 
 import csv
 import os
-from unicodedata import normalize
 
 import numpy as np
 from PIL import Image
@@ -39,9 +38,9 @@ class ArtEmisDataset(Dataset):
             annos = [
                 {
                     'art_style': line[names2id['art_style']],
-                    'painting': normalize(
-                        'NFD', line[names2id['painting']]
-                        ).encode('ascii', 'ignore').decode("utf-8"),
+                    'painting': str.encode(
+                        line[names2id['painting']], 'ascii', errors="ignore"
+                    ).decode("utf-8"),
                     'emotion': line[names2id['emotion']],
                     'utterance': line[names2id['utterance']]
                 }
@@ -137,6 +136,8 @@ class ArtEmisImageDataset(ArtEmisDataset):
                 per_img[anno['painting']] = {
                     'painting': anno['painting'],
                     'art_style': anno['art_style'],
+                    'orig': anno['orig'],
+                    'new': anno['new'],
                     'emotion': set(),
                     'utterance': set()
                 }
@@ -148,7 +149,9 @@ class ArtEmisImageDataset(ArtEmisDataset):
         """Return a sample to form batch."""
         anno = self.annos[index]
         # Load image
-        img = self._load_image("{0}/{1}.jpg".format(anno['art_style'], anno['painting']))
+        img = self._load_image("{0}/{1}.jpg".format(
+            anno['art_style'], anno['painting'])
+        )
         # Art-style to index
         style = self.styles[anno['art_style']]
         # Emotions to index
