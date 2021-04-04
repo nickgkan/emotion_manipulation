@@ -19,7 +19,7 @@ def rename_images(im_path):
 if __name__ == '__main__':
     # Parse arguments
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("--im_path", "images/")
+    argparser.add_argument("--im_path", default="images/", type=str)
     argparser.add_argument("--rename_images", default=0, type=int)
     args = argparser.parse_args()
 
