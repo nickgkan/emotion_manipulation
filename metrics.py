@@ -3,7 +3,7 @@
 from sklearn.metrics import average_precision_score
 
 
-def compute_ap(gt, pred, valid, average=None):
+def compute_ap(gt, pred, average=None):
     """
     Compute the multi-label Average Precision.
 
