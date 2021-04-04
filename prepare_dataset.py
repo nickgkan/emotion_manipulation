@@ -2,7 +2,6 @@
 
 import argparse
 import os
-from unicodedata import normalize
 
 
 def rename_images(im_path):
@@ -16,8 +15,6 @@ def rename_images(im_path):
                 name = name.replace(na, '')
             name = str.encode(name, 'ascii', errors="ignore").decode("utf-8")
             name = os.path.join(im_path, subfolder, name)
-            if old_name != name or '#' in name:
-                print(old_name,name)
             os.rename(old_name, name)
 
 

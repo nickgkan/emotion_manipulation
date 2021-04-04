@@ -1,4 +1,5 @@
-import torch
+"""Flexible class for ResNet backbone."""
+
 import torch.nn as nn
 
 from torchvision import models
