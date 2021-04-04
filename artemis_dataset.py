@@ -136,8 +136,6 @@ class ArtEmisImageDataset(ArtEmisDataset):
                 per_img[anno['painting']] = {
                     'painting': anno['painting'],
                     'art_style': anno['art_style'],
-                    'orig': anno['orig'],
-                    'new': anno['new'],
                     'emotion': set(),
                     'utterance': set()
                 }
