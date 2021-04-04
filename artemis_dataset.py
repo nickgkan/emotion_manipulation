@@ -76,6 +76,9 @@ class ArtEmisDataset(Dataset):
     def _load_image(self, img_name):
         """Load image and add augmentations."""
         img_name = os.path.join(self.im_path, img_name)
+        _img = Image.open(img_name)
+        width, height = _img.size
+        max_wh = max(width, height)
         mean_ = [0.485, 0.456, 0.406]
         std_ = [0.229, 0.224, 0.225]
         size = 224
@@ -84,6 +87,7 @@ class ArtEmisDataset(Dataset):
                 transforms.RandomHorizontalFlip(0.5),
                 transforms.RandomRotation(20),
                 transforms.RandomPerspective(0.1, 0.5),
+                transforms.Pad((0, 0, max_wh - width, max_wh - height)),
                 transforms.Resize((size + 16, size + 16)),
                 transforms.RandomCrop(size),
                 transforms.ToTensor(),
@@ -133,8 +137,9 @@ class ArtEmisImageDataset(ArtEmisDataset):
         per_img = dict()
         for anno in annos:
             if anno['painting'] not in per_img:
+                end = anno['painting'].split('.')[-1]
                 per_img[anno['painting']] = {
-                    'painting': anno['painting'],
+                    'painting': anno['painting'].replace(end, '_resize' + end),
                     'art_style': anno['art_style'],
                     'emotion': set(),
                     'utterance': set()
@@ -148,8 +153,8 @@ class ArtEmisImageDataset(ArtEmisDataset):
         anno = self.annos[index]
         # Load image
         img = self._load_image("{0}/{1}.jpg".format(
-            anno['art_style'], anno['painting'])
-        )
+            anno['art_style'], anno['painting']
+        ))
         # Art-style to index
         style = self.styles[anno['art_style']]
         # Emotions to index

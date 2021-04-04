@@ -3,6 +3,8 @@
 import argparse
 import os
 
+from PIL import Image
+
 
 def rename_images(im_path):
     """Rename images to clear special characters."""
@@ -18,13 +20,31 @@ def rename_images(im_path):
             os.rename(old_name, name)
 
 
+def resize_images(im_path):
+    """Resize images to a fixed size."""
+    for subfolder in os.listdir(im_path):
+        for name in os.listdir(os.path.join(im_path, subfolder)):
+            name = os.path.join(im_path, subfolder, name)
+            _img = Image.open(name)
+            width, height = _img.size
+            scale = 224 / min(width, height)
+            _img = _img.resize((int(width * scale), int(height * scale)))
+            # Rename
+            end = name.split('.')[-1]
+            name = name.replace(end, '_resize' + end)
+            _img.save(name)
+
+
 if __name__ == '__main__':
     # Parse arguments
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--im_path", default="images/", type=str)
     argparser.add_argument("--rename_images", default=0, type=int)
+    argparser.add_argument("--resize_images", default=0, type=int)
     args = argparser.parse_args()
 
     # Run function pipeline
     if args.rename_images:
         rename_images(args.im_path)
+    if args.resize_images:
+        resize_images(args.im_path)
