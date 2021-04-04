@@ -9,11 +9,16 @@ def rename_images(im_path):
     """Rename images to clear special characters."""
     for subfolder in os.listdir(im_path):
         for name in os.listdir(os.path.join(im_path, subfolder)):
-            clear_name = normalize('NFD', name).encode('ascii', 'ignore')
-            os.rename(
-                os.path.join(im_path, subfolder, name),
-                os.path.join(im_path, subfolder, clear_name.decode("utf-8"))
-            )
+            old_name = os.path.join(im_path, subfolder, name)
+            tildes = [t for t in range(len(name)) if name[t] == '#']
+            non_asciis = [name[t:t+6] for t in tildes]
+            for na in non_asciis:
+                name = name.replace(na, '')
+            name = str.encode(name, 'ascii', errors="ignore").decode("utf-8")
+            name = os.path.join(im_path, subfolder, name)
+            if old_name != name or '#' in name:
+                print(old_name,name)
+            os.rename(old_name, name)
 
 
 if __name__ == '__main__':
