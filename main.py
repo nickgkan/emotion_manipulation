@@ -111,7 +111,6 @@ def eval_classifier(model, data_loader, args):
 
 def main():
     """Run main training/test pipeline."""
-    data_path = "/projects/katefgroup/language_grounding/"
     data_path = "/projects/katefgroup/viewpredseg/art/"
     if not osp.exists(data_path):
         data_path = 'data/'  # or change this if you work locally
@@ -147,7 +146,7 @@ def main():
     }
 
     # Train classifier
-    model = ResNetClassifier(num_classes=9, pretrained=True, layers=34)
+    model = ResNetClassifier(num_classes=9, pretrained=True, freeze_backbone=True, layers=50)
     model = train_classifier(model.to(args.device), data_loaders, args)
     eval_classifier(model, data_loaders['test'], args)
 

@@ -142,7 +142,7 @@ class ArtEmisImageDataset(ArtEmisDataset):
                     'art_style': anno['art_style'],
                     'emotion': set(),
                     'utterance': set(),
-                    'painting': anno['painting'].replace(end, '_resize.' + end)
+                    'painting': anno['painting'] + '._resize'
                 }
             per_img[anno['painting']]['emotion'].add(anno['emotion'])
             per_img[anno['painting']]['utterance'].add(anno['utterance'])
