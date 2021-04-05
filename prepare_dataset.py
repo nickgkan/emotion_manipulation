@@ -28,7 +28,7 @@ def resize_images(im_path):
             name = os.path.join(im_path, subfolder, name)
             end = '.' + name.split('.')[-1]
             new_name = name.replace(end, '_resize' + end)
-            if not os.path.exists(new_name):
+            if not os.path.exists(new_name) or 'resize' in name:
                 _img = Image.open(name)
                 width, height = _img.size
                 scale = 224 / min(width, height)
