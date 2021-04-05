@@ -26,22 +26,15 @@ def resize_images(im_path):
     for subfolder in os.listdir(im_path):
         for name in tqdm(os.listdir(os.path.join(im_path, subfolder))):
             name = os.path.join(im_path, subfolder, name)
-            _img = Image.open(name)
-            width, height = _img.size
-            scale = 224 / min(width, height)
-            _img = _img.resize((int(width * scale), int(height * scale)))
-            # Rename
             end = '.' + name.split('.')[-1]
-            name = name.replace(end, '_resize' + end)
-            _img.save(name)
-
-
-def remove_images(im_path):
-    """Resize images to a fixed size."""
-    for subfolder in os.listdir(im_path):
-        for name in tqdm(os.listdir(os.path.join(im_path, subfolder))):
-            if '_resize' in name:
-                os.remove(name)
+            new_name = name.replace(end, '_resize' + end)
+            if not os.path.exists(new_name):
+                _img = Image.open(name)
+                width, height = _img.size
+                scale = 224 / min(width, height)
+                _img = _img.resize((int(width * scale), int(height * scale)))
+                # Rename
+                _img.save(new_name)
 
 
 if __name__ == '__main__':
@@ -57,4 +50,3 @@ if __name__ == '__main__':
         rename_images(args.im_path)
     if args.resize_images:
         resize_images(args.im_path)
-    remove_images(args.im_path)
