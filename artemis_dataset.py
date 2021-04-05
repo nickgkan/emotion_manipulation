@@ -137,12 +137,11 @@ class ArtEmisImageDataset(ArtEmisDataset):
         per_img = dict()
         for anno in annos:
             if anno['painting'] not in per_img:
-                end = anno['painting'].split('.')[-1]
                 per_img[anno['painting']] = {
                     'art_style': anno['art_style'],
                     'emotion': set(),
                     'utterance': set(),
-                    'painting': anno['painting'] + '._resize'
+                    'painting': anno['painting'] + '_resize'
                 }
             per_img[anno['painting']]['emotion'].add(anno['emotion'])
             per_img[anno['painting']]['utterance'].add(anno['utterance'])

@@ -4,15 +4,19 @@ import torch.nn as nn
 
 from torchvision import models
 
+
 def requires_grad(parameters, flag=True):
     for p in parameters:
         p.requires_grad = flag
 
+
 class ResNetClassifier(nn.Module):
 
-    def __init__(self, num_classes=8, pretrained=True, freeze_backbone=False, layers=50):
+    def __init__(self, num_classes=9, pretrained=True, freeze_backbone=False,
+                 layers=50):
         super(ResNetClassifier, self).__init__()
         self.num_classes = num_classes
+        self.freeze_backbone = freeze_backbone
 
         if layers == 18:
             self.net = models.resnet18(pretrained=pretrained)
@@ -38,3 +42,7 @@ class ResNetClassifier(nn.Module):
     def forward(self, x):
         """Forward pass for an input image (B, 3, 224, 224)."""
         return self.net(x)
+
+    def train(self, mode=True):
+        """Override train to control batch-norm layers."""
+        nn.Module.train(self, mode and not self.freeze_backbone)

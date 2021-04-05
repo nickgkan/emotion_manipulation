@@ -146,7 +146,10 @@ def main():
     }
 
     # Train classifier
-    model = ResNetClassifier(num_classes=9, pretrained=True, freeze_backbone=True, layers=50)
+    model = ResNetClassifier(
+        num_classes=len(data_loaders['train'].dataset.emotions),
+        pretrained=True, freeze_backbone=True, layers=50
+    )
     model = train_classifier(model.to(args.device), data_loaders, args)
     eval_classifier(model, data_loaders['test'], args)
 
