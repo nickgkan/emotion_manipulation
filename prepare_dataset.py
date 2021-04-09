@@ -26,15 +26,21 @@ def resize_images(im_path):
     for subfolder in os.listdir(im_path):
         for name in tqdm(os.listdir(os.path.join(im_path, subfolder))):
             name = os.path.join(im_path, subfolder, name)
+            if 'resize' in name:
+                continue
             end = '.' + name.split('.')[-1]
             new_name = name.replace(end, '_resize' + end)
-            if not os.path.exists(new_name) or 'resize' in name:
+            if os.path.exists(new_name):
+                continue
+            try:
                 _img = Image.open(name)
                 width, height = _img.size
                 scale = 224 / min(width, height)
                 _img = _img.resize((int(width * scale), int(height * scale)))
                 # Rename
                 _img.save(new_name)
+            except:
+                print(name, 'is probably corrupted')
 
 
 if __name__ == '__main__':
