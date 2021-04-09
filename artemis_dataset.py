@@ -79,6 +79,7 @@ class ArtEmisDataset(Dataset):
         _img = Image.open(img_name)
         width, height = _img.size
         max_wh = max(width, height)
+        assert min(width, height) == 224
         mean_ = [0.485, 0.456, 0.406]
         std_ = [0.229, 0.224, 0.225]
         size = 224

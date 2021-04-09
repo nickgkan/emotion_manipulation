@@ -131,7 +131,7 @@ def main():
     args = argparser.parse_args()
     args.classifier_ckpnt = osp.join(args.checkpoint_path, args.checkpoint)
     args.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-    os.makedirs(args.checkpoint, exist_ok=True)
+    os.makedirs(args.checkpoint_path, exist_ok=True)
 
     # Data loaders for classification
     data_loaders = {
