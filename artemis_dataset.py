@@ -101,7 +101,7 @@ class ArtEmisDataset(Dataset):
                 transforms.ToTensor(),
                 transforms.Normalize(mean_, std_)
             ])
-        return preprocessing(Image.open(img_name))  # (1, H, W, 3)
+        return preprocessing(_img)  # (1, H, W, 3)
 
     def __len__(self):
         """Return number of annotations."""
