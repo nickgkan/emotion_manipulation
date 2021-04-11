@@ -159,6 +159,6 @@ class ArtEmisImageDataset(ArtEmisDataset):
         style = self.styles[anno['art_style']]
         # Emotions to index
         emotions = np.zeros((len(self.emotions),))
-        for emotion in anno['emotion']:
-            emotions[self.emotions[emotion]] = 1
+        emotions[list(map(self.emotions.get, anno['emotion']))] = 1
         return img, style, emotions
+
