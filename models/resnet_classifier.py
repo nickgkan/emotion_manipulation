@@ -29,14 +29,20 @@ class ResNetClassifier(nn.Module):
         else:
             raise NotImplementedError
 
-        self.net.fc = nn.Linear(self.net.fc.in_features, self.num_classes)
+        self.net.fc = nn.Sequential(
+            nn.Linear(self.net.fc.in_features, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(512, self.num_classes)
+        )
 
         if freeze_backbone:
             # first set all to False
             requires_grad(list(self.net.parameters()), False)
 
             # set the last conv block and fc layer to True
-            requires_grad(list(self.net.layer4.parameters()), True)
+            # requires_grad(list(self.net.layer4.parameters()), True)
             requires_grad(list(self.net.fc.parameters()), True)
 
     def forward(self, x):
@@ -46,3 +52,4 @@ class ResNetClassifier(nn.Module):
     def train(self, mode=True):
         """Override train to control batch-norm layers."""
         nn.Module.train(self, mode and not self.freeze_backbone)
+        self.net.fc.train(mode=mode)
