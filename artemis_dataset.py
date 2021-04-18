@@ -8,9 +8,6 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-import ipdb
-# st = ipdb.set_trace
-
 
 class ArtEmisDataset(Dataset):
     """
@@ -140,11 +137,11 @@ class ArtEmisImageDataset(ArtEmisDataset):
             if anno['painting'] not in per_img:
                 per_img[anno['painting']] = {
                     'art_style': anno['art_style'],
-                    'emotion': set(),
+                    'emotion': [],
                     'utterance': set(),
                     'painting': anno['painting'] + '_resize'
                 }
-            per_img[anno['painting']]['emotion'].add(anno['emotion'])
+            per_img[anno['painting']]['emotion'].append(anno['emotion'])
             per_img[anno['painting']]['utterance'].add(anno['utterance'])
         return per_img
 
@@ -161,4 +158,3 @@ class ArtEmisImageDataset(ArtEmisDataset):
         emotions = np.zeros((len(self.emotions),))
         emotions[list(map(self.emotions.get, anno['emotion']))] = 1
         return img, style, emotions
-

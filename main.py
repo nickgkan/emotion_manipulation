@@ -15,24 +15,75 @@ from torch.utils.tensorboard import SummaryWriter
 from artemis_dataset import ArtEmisImageDataset
 from early_stopping_scheduler import EarlyStopping
 from metrics import compute_ap
-from models.resnet_classifier import ResNetClassifier
+from models.resnet_classifier import ResNetClassifier, requires_grad
 
 
+def load_from_ckpnt(ckpnt, model, optimizer=None, scheduler=None):
+    """Load trained parameters from given checkpoint."""
+    start_epoch = 0
+    is_trained = False
+    if osp.exists(ckpnt):
+        checkpoint = torch.load(ckpnt)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        if optimizer is not None:
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        if scheduler is not None:
+            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+        start_epoch = checkpoint["epoch"]
+        is_trained = checkpoint.get("is_trained", False)
+    return model, optimizer, scheduler, start_epoch, is_trained
+
+
+def langevin_updates(model, neg_samples, nsteps, langevin_lr):
+    """Apply nsteps iterations of Langevin dynamics on neg_samples."""
+    # Deactivate model gradients
+    requires_grad(model.parameters(), False)
+    model.eval()
+    # Activate samples gradients
+    neg_samples.requires_grad = True
+    noise = torch.randn_like(neg_samples).to(neg_samples.device)  # noise
+    # Langevin steps
+    negs = [torch.clone(neg_samples[0]).detach()]  # for visualization
+    for k in range(nsteps):
+        # Noise
+        noise.normal(0, 0.005)
+        neg_samples.add_(noise.data)
+        # Forward-backward
+        neg_out = model(neg_samples)
+        neg_out.sum().backward()
+        # Update neg_samples
+        neg_samples.grad.data.clamp_(-0.01, 0.01)
+        neg_samples.data.add_(-langevin_lr, neg_samples.grad.data)
+        # Zero gradients
+        neg_samples.grad.detach_()
+        neg_samples.grad.zero_()
+        # Clamp
+        neg_samples.data.clamp(-0.485 / 0.224, (1 - 0.406) / 0.224)
+        # Store intermediate results for visualization
+        negs.append(torch.clone(neg_samples[0]).detach())
+    # Detach samples
+    neg_samples = neg_samples.detach()
+    # Reactivate model gradients
+    requires_grad(model.parameters(), True)
+    model.train()
+    return neg_samples, negs
+
+
+@torch.no_grad()
 def clip_grad(parameters, optimizer):
-    with torch.no_grad():
-        for group in optimizer.param_groups:
-            for p in group['params']:
-                state = optimizer.state[p]
+    for group in optimizer.param_groups:
+        for p in group['params']:
+            state = optimizer.state[p]
 
-                if 'step' not in state or state['step'] < 1:
-                    continue
+            if 'step' not in state or state['step'] < 1:
+                continue
 
-                step = state['step']
-                exp_avg_sq = state['exp_avg_sq']
-                _, beta2 = group['betas']
+            step = state['step']
+            exp_avg_sq = state['exp_avg_sq']
+            _, beta2 = group['betas']
 
-                bound = 3 * torch.sqrt(exp_avg_sq / (1 - beta2 ** step)) + 0.1
-                p.grad.data.copy_(torch.max(torch.min(p.grad.data, bound), -bound))
+            bound = 3 * torch.sqrt(exp_avg_sq / (1 - beta2 ** step)) + 0.1
+            p.grad.data.copy_(torch.max(torch.min(p.grad.data, bound), -bound))
 
 
 def train_classifier(model, data_loaders, args):
@@ -43,18 +94,9 @@ def train_classifier(model, data_loaders, args):
     scheduler = EarlyStopping(
         optimizer, factor=0.3, mode='max', max_decays=1, patience=3
     )
-    start_epoch = 0
-    is_trained = False
-    if osp.exists(args.classifier_ckpnt):
-        checkpoint = torch.load(args.classifier_ckpnt)
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        scheduler = EarlyStopping(
-            optimizer, factor=0.3, mode='max', max_decays=1, patience=3
-        )
-        scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-        start_epoch = checkpoint["epoch"]
-        is_trained = checkpoint["is_trained"]
+    model, optimizer, scheduler, start_epoch, is_trained = load_from_ckpnt(
+        args.classifier_ckpnt, model, optimizer, scheduler
+    )
     if is_trained:
         return model
     writer = SummaryWriter('runs/' + args.checkpoint.replace('.pt', ''))
@@ -66,8 +108,6 @@ def train_classifier(model, data_loaders, args):
         model.train()
         for step, ex in enumerate(data_loaders['train']):
             images, _, emotions = ex
-            # import ipdb
-            # ipdb.set_trace()
             logits = model(images.to(device))
             labels = emotions.to(device)
             loss = F.binary_cross_entropy_with_logits(logits, labels)
@@ -116,15 +156,9 @@ def train_generator(model, data_loaders, args):
     """Train an emotion EBM."""
     device = args.device
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
-
-    start_epoch = 0
-    is_trained = False
-    if osp.exists(args.classifier_ckpnt):
-        checkpoint = torch.load(args.classifier_ckpnt)
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_epoch = checkpoint["epoch"]
-        is_trained = checkpoint["is_trained"]
+    model, optimizer, _, start_epoch, is_trained = load_from_ckpnt(
+        args.classifier_ckpnt, model, optimizer, scheduler=None
+    )
     if is_trained:
         return model
     writer = SummaryWriter('runs/' + args.checkpoint.replace('.pt', ''))
@@ -136,46 +170,35 @@ def train_generator(model, data_loaders, args):
         model.train()
         for step, ex in enumerate(data_loaders['train']):
             images, _, emotions = ex
-            requires_grad(model.parameters(), False)
-            model.eval()
             # positive samples
             pos_samples = images
             # negative samples
             neg_samples = torch.randn_like(pos_samples).to(device)
-            neg_samples.requires_grad=True
-            # noise
-            noise = torch.randn_like(neg_samples).to(device)
-            # Langevin steps
-            for k in range(args.langevin_steps):
-                noise.normal(0, 0.005)
-                neg_samples.add_(noise.data)
-
-                neg_out = model(neg_samples)
-                neg_out.sum().backward()
-
-                neg_samples.grad.data.clamp_(-0.01, 0.01)
-                neg_samples.data.add_(-args.langevin_step_size, neg_samples.grad.data)
-
-                neg_samples.grad.detach_()
-                neg_samples.grad.zero_()
-
-                neg_samples.data.clamp(0, 1)
-
-            neg_samples = neg_samples.detach()
-
-            requires_grad(model.parameters(), True)
-            model.train()
-
+            neg_samples, neg_list = langevin_updates(
+                model, torch.randn_like(pos_samples).to(device),
+                args.langevin_steps, args.langevin_step_size
+            )
+            # Compute energy
             pos_out = model(pos_samples)
             neg_out = model(neg_samples)
-
-            loss = pos_out**2 + neg_out **2 + pos_out - neg_out
+            # Loss
+            loss = pos_out**2 + neg_out**2 + pos_out - neg_out
             loss = loss.mean()
-
+            # Step
             optimizer.zero_grad()
             loss.backward()
             clip_grad(model.parameters(), optimizer)
             optimizer.step()
+            kbar.update(step, [("loss", loss)])
+        # Save checkpoint
+        torch.save(
+            {
+                "epoch": epoch + 1,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict()
+            },
+            args.classifier_ckpnt
+        )
 
 
 @torch.no_grad()
@@ -216,6 +239,8 @@ def main():
     argparser.add_argument("--batch_size", default=128, type=int)
     argparser.add_argument("--lr", default=1e-3, type=float)
     argparser.add_argument("--wd", default=1e-5, type=float)
+    argparser.add_argument("--langevin_steps", default=20, type=int)
+    argparser.add_argument("--langevin_step_size", default=10, type=float)
     args = argparser.parse_args()
     args.classifier_ckpnt = osp.join(args.checkpoint_path, args.checkpoint)
     args.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
