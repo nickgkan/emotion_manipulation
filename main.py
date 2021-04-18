@@ -74,7 +74,10 @@ def train_classifier(model, data_loaders, args):
             model.load_state_dict(checkpoint["model_state_dict"])
             optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         # Load checkpoint to update scheduler and epoch
-        checkpoint = torch.load(args.classifier_ckpnt)
+        if osp.exists(args.classifier_ckpnt):
+            checkpoint = torch.load(args.classifier_ckpnt)
+        else:
+            checkpoint = {"epoch": 0}
         checkpoint["scheduler_state_dict"] = scheduler.state_dict()
         checkpoint["epoch"] += 1
         checkpoint["is_trained"] = not keep_training
@@ -148,7 +151,7 @@ def main():
     # Train classifier
     model = ResNetClassifier(
         num_classes=len(data_loaders['train'].dataset.emotions),
-        pretrained=True, freeze_backbone=True, layers=50
+        pretrained=True, freeze_backbone=True, layers=34
     )
     model = train_classifier(model.to(args.device), data_loaders, args)
     eval_classifier(model, data_loaders['test'], args)
