@@ -1,4 +1,4 @@
-"""Train and test classification on ScanNet."""
+"""Train and test classification on ArtEmis."""
 
 import argparse
 import os
@@ -18,8 +18,25 @@ from metrics import compute_ap
 from models.resnet_classifier import ResNetClassifier
 
 
+def clip_grad(parameters, optimizer):
+    with torch.no_grad():
+        for group in optimizer.param_groups:
+            for p in group['params']:
+                state = optimizer.state[p]
+
+                if 'step' not in state or state['step'] < 1:
+                    continue
+
+                step = state['step']
+                exp_avg_sq = state['exp_avg_sq']
+                _, beta2 = group['betas']
+
+                bound = 3 * torch.sqrt(exp_avg_sq / (1 - beta2 ** step)) + 0.1
+                p.grad.data.copy_(torch.max(torch.min(p.grad.data, bound), -bound))
+
+
 def train_classifier(model, data_loaders, args):
-    """Train a 3d object classifier."""
+    """Train an emotion classifier."""
     # Setup
     device = args.device
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
@@ -49,6 +66,8 @@ def train_classifier(model, data_loaders, args):
         model.train()
         for step, ex in enumerate(data_loaders['train']):
             images, _, emotions = ex
+            import ipdb
+            ipdb.set_trace()
             logits = model(images.to(device))
             labels = emotions.to(device)
             loss = F.binary_cross_entropy_with_logits(logits, labels)
@@ -91,6 +110,72 @@ def train_classifier(model, data_loaders, args):
     test_acc = eval_classifier(model, data_loaders['test'], args)
     print(f"Test Accuracy: {test_acc}")
     return model
+
+
+def train_generator(model, data_loaders, args):
+    """Train an emotion EBM."""
+    device = args.device
+    optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
+
+    start_epoch = 0
+    is_trained = False
+    if osp.exists(args.classifier_ckpnt):
+        checkpoint = torch.load(args.classifier_ckpnt)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_epoch = checkpoint["epoch"]
+        is_trained = checkpoint["is_trained"]
+    if is_trained:
+        return model
+    writer = SummaryWriter('runs/' + args.checkpoint.replace('.pt', ''))
+
+    # Training loop
+    for epoch in range(start_epoch, args.epochs):
+        print("Epoch: %d/%d" % (epoch + 1, args.epochs))
+        kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
+        model.train()
+        for step, ex in enumerate(data_loaders['train']):
+            images, _, emotions = ex
+            requires_grad(model.parameters(), False)
+            model.eval()
+            # positive samples
+            pos_samples = images
+            # negative samples
+            neg_samples = torch.randn_like(pos_samples).to(device)
+            neg_samples.requires_grad=True
+            # noise
+            noise = torch.randn_like(neg_samples).to(device)
+            # Langevin steps
+            for k in range(args.langevin_steps):
+                noise.normal(0, 0.005)
+                neg_samples.add_(noise.data)
+
+                neg_out = model(neg_samples)
+                neg_out.sum().backward()
+
+                neg_samples.grad.data.clamp_(-0.01, 0.01)
+                neg_samples.data.add_(-args.langevin_step_size, neg_samples.grad.data)
+
+                neg_samples.grad.detach_()
+                neg_samples.grad.zero_()
+
+                neg_samples.data.clamp(0, 1)
+
+            neg_samples = neg_samples.detach()
+
+            requires_grad(model.parameters(), True)
+            model.train()
+
+            pos_out = model(pos_samples)
+            neg_out = model(neg_samples)
+
+            loss = pos_out**2 + neg_out **2 + pos_out - neg_out
+            loss = loss.mean()
+
+            optimizer.zero_grad()
+            loss.backward()
+            clip_grad(model.parameters(), optimizer)
+            optimizer.step()
 
 
 @torch.no_grad()
