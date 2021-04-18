@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 import ipdb
-st = ipdb.set_trace
+# st = ipdb.set_trace
 
 
 class ArtEmisDataset(Dataset):

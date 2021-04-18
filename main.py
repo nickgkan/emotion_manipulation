@@ -66,8 +66,8 @@ def train_classifier(model, data_loaders, args):
         model.train()
         for step, ex in enumerate(data_loaders['train']):
             images, _, emotions = ex
-            import ipdb
-            ipdb.set_trace()
+            # import ipdb
+            # ipdb.set_trace()
             logits = model(images.to(device))
             labels = emotions.to(device)
             loss = F.binary_cross_entropy_with_logits(logits, labels)
