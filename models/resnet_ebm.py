@@ -19,13 +19,18 @@ class ResNetEBM(nn.Module):
         else:
             raise NotImplementedError
 
-        # scoring layer
-        self.net.fc = nn.Linear(self.net.fc.in_features, 1)
+        # scoring layers
+        self.net.fc = nn.Sequential(
+            nn.Linear(self.net.fc.in_features, 512),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(512, 1)
+        )
         
-    def forward(self, cls, xyz, pad_mask):
+    def forward(self, x):
         """Forward pass for an input image (B, 3, 224, 224)."""
         return self.net(x)
 
     def train(self, mode=True):
         """Override train to control batch-norm layers."""
-        nn.Module.train(self, mode and not self.freeze_backbone)
+        nn.Module.train(self, mode)
