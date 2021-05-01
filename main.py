@@ -324,6 +324,7 @@ def main():
     argparser.add_argument("--ebm_log_fps", default=6, type=int)
     argparser.add_argument("--run_classifier", action='store_true')
     argparser.add_argument("--run_generator", action='store_true')
+    argparser.add_argument("--emot_label", default=None)
     args = argparser.parse_args()
     args.classifier_ckpnt = osp.join(args.checkpoint_path, args.checkpoint)
     args.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -332,7 +333,7 @@ def main():
     # Data loaders for classification
     data_loaders = {
         mode: DataLoader(
-            ArtEmisDataset(mode, args.im_path),
+            ArtEmisDataset(mode, args.im_path, emot_label=args.emot_label),
             batch_size=args.batch_size,
             shuffle=mode == 'train',
             drop_last=mode == 'train',
@@ -342,6 +343,9 @@ def main():
     }
 
     # Train classifier
+    # Emotion labels
+    #{'amusement': 0, 'anger': 1, 'awe': 2, 'contentment': 3, 'disgust': 4,
+    #'excitement': 5, 'fear': 6, 'sadness': 7, 'something else': 8}
     if args.run_classifier:
         model = ResNetClassifier(
             num_classes=len(data_loaders['train'].dataset.emotions),
@@ -353,7 +357,7 @@ def main():
     # Train generator
     if args.run_generator:
         model = ResNetEBM(
-            pretrained=True, layers=50
+            pretrained=True, freeze_backbone=True, layers=50
         )
         model = train_generator(model.to(args.device), data_loaders, args)
         eval_generator(model.to(args.device), data_loaders['test'], args)
