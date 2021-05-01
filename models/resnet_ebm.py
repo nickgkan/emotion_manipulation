@@ -5,8 +5,9 @@ from torchvision import models
 
 class ResNetEBM(nn.Module):
 
-    def __init__(self, pretrained=True, layers=50):
+    def __init__(self, pretrained=True, freeze_backbone=False, layers=50):
         super(ResNetEBM, self).__init__()
+        self.freeze_backbone = freeze_backbone
 
         if layers == 18:
             self.net = models.resnet18(pretrained=pretrained)
