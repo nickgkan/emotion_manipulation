@@ -17,14 +17,16 @@ class ArtEmisDataset(Dataset):
         split (str): train/val/test
         im_path (str): path to images
         seed (int): random seed for dataset splitting
+        emot_label (str): emotion label to filter images
     """
 
-    def __init__(self, split, im_path, seed=1184):
+    def __init__(self, split, im_path, seed=1184, emot_label=None):
         """Initialize task-independent dataset."""
         super().__init__()
         self.split = split
         self.im_path = im_path
-        self.annos = self.load_annotations(split, seed)
+        self.emot_label = emot_label
+        self.annos, self.neg_annos = self.load_annotations(split, seed)
         self.styles, self.emotions = self._get_classes()
 
     @staticmethod
@@ -65,10 +67,45 @@ class ArtEmisDataset(Dataset):
             inds = inds[int(0.9 * len(inds)):]
         return inds
 
+    def load_annotations(self, split, seed):
+        """Load annotations."""
+        # Read from csv
+        annos = self._read_from_csv()
+        # Adapt to task
+        annos = self._to_img_wise(annos)
+        # Split
+        imgs = sorted(list(annos.keys()))
+        # imgs = sorted(list(set(anno['painting'] for anno in annos)))
+        inds = self._sample_split_indices(len(imgs), split, seed)
+        imgs = np.asarray(imgs)[inds].tolist()
+        if self.emot_label is None:
+            return [annos[img] for img in imgs], None
+        return (
+            [
+                annos[img] for img in imgs
+                if self.emot_label in annos[img]['emotion']
+            ],
+            [
+                annos[img] for img in imgs
+                if self.emot_label not in annos[img]['emotion']
+            ]
+        )
+
     @staticmethod
-    def load_annotations(split, seed):
-        """Load annotations (abstract method)."""
-        return []
+    def _to_img_wise(annos):
+        """Convert annotation list to image-wise annotations."""
+        per_img = dict()
+        for anno in annos:
+            if anno['painting'] not in per_img:
+                per_img[anno['painting']] = {
+                    'art_style': anno['art_style'],
+                    'emotion': [],
+                    'utterance': set(),
+                    'painting': anno['painting'] + '_resize'
+                }
+            per_img[anno['painting']]['emotion'].append(anno['emotion'])
+            per_img[anno['painting']]['utterance'].add(anno['utterance'])
+        return per_img
 
     def _load_image(self, img_name):
         """Load image and add augmentations."""
@@ -94,6 +131,7 @@ class ArtEmisDataset(Dataset):
             ])
         else:
             preprocessing = transforms.Compose([
+                transforms.Pad((0, 0, max_wh - width, max_wh - height)),
                 transforms.Resize((size, size)),
                 transforms.ToTensor(),
                 transforms.Normalize(mean_, std_)
@@ -103,47 +141,6 @@ class ArtEmisDataset(Dataset):
     def __len__(self):
         """Return number of annotations."""
         return len(self.annos)
-
-    def __getitem__(self, index):
-        """Return a sample to form batch."""
-        return []  # re-implement in child!
-
-
-class ArtEmisImageDataset(ArtEmisDataset):
-    """Image-based dataset for ArtEmis."""
-
-    def __init__(self, split, im_path, seed=1184):
-        """Initialize dataset."""
-        super().__init__(split, im_path, seed)
-
-    def load_annotations(self, split, seed):
-        """Load annotations."""
-        # Read from csv
-        annos = self._read_from_csv()
-        # Adapt to task
-        annos = self._to_img_wise(annos)
-        # Split
-        imgs = sorted(list(annos.keys()))
-        # imgs = sorted(list(set(anno['painting'] for anno in annos)))
-        inds = self._sample_split_indices(len(imgs), split, seed)
-        imgs = np.asarray(imgs)[inds].tolist()
-        return [annos[img] for img in imgs]
-
-    @staticmethod
-    def _to_img_wise(annos):
-        """Convert annotation list to image-wise annotations."""
-        per_img = dict()
-        for anno in annos:
-            if anno['painting'] not in per_img:
-                per_img[anno['painting']] = {
-                    'art_style': anno['art_style'],
-                    'emotion': [],
-                    'utterance': set(),
-                    'painting': anno['painting'] + '_resize'
-                }
-            per_img[anno['painting']]['emotion'].append(anno['emotion'])
-            per_img[anno['painting']]['utterance'].add(anno['utterance'])
-        return per_img
 
     def __getitem__(self, index):
         """Return a sample to form batch."""
@@ -157,4 +154,11 @@ class ArtEmisImageDataset(ArtEmisDataset):
         # Emotions to index
         emotions = np.zeros((len(self.emotions),))
         emotions[list(map(self.emotions.get, anno['emotion']))] = 1
-        return img, style, emotions
+        # Bring a negative img if emotion is specified
+        neg_img = None
+        if self.neg_annos is not None:
+            neg = self.neg_annos[np.random.randint(0, len(self.neg_annos) - 1)]
+            neg_img = self._load_image("{0}/{1}.jpg".format(
+                neg['art_style'], neg['painting']
+            ))
+        return img, style, emotions, neg_img

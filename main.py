@@ -1,6 +1,4 @@
 """Train and test classification on ArtEmis."""
-import ipdb
-st = ipdb.set_trace
 
 import argparse
 import os
@@ -14,7 +12,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from artemis_dataset import ArtEmisImageDataset
+from artemis_dataset import ArtEmisDataset
 from early_stopping_scheduler import EarlyStopping
 from metrics import compute_ap
 from models.resnet_classifier import ResNetClassifier, requires_grad
@@ -22,11 +20,14 @@ from models.resnet_ebm import ResNetEBM
 from pytorch_grad_cam import GradCAM
 import cv2
 
+import ipdb
+st = ipdb.set_trace
+
 
 def unnormalize_imagenet_rgb(image, device):
-    """unnormalizes normalized rgb using imagenet stats"""
-    mean_ = torch.as_tensor([0.485, 0.456, 0.406]).reshape(3,1,1).to(device)
-    std_ = torch.as_tensor([0.229, 0.224, 0.225]).reshape(3,1,1).to(device)
+    """Unnormalize normalized rgb using imagenet stats."""
+    mean_ = torch.as_tensor([0.485, 0.456, 0.406]).reshape(3, 1, 1).to(device)
+    std_ = torch.as_tensor([0.229, 0.224, 0.225]).reshape(3, 1, 1).to(device)
     image = (image * std_) + mean_
     return image
 
@@ -124,7 +125,7 @@ def train_classifier(model, data_loaders, args):
         kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
         model.train()
         for step, ex in enumerate(data_loaders['train']):
-            images, _, emotions = ex
+            images, _, emotions, _ = ex
             logits = model(images.to(device))
             labels = emotions.to(device)
             loss = F.binary_cross_entropy_with_logits(logits, labels)
@@ -186,7 +187,7 @@ def train_generator(model, data_loaders, args):
         kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
         model.train()
         for step, ex in enumerate(data_loaders['train']):
-            images, _, emotions = ex
+            images, _, emotions, neg_images = ex
             # positive samples
             pos_samples = images.to(device)
             # negative samples
@@ -198,9 +199,12 @@ def train_generator(model, data_loaders, args):
             # Compute energy
             pos_out = model(pos_samples)
             neg_out = model(neg_samples)
+            neg_img_out = model(neg_images.to(device))
             # Loss
-            loss = pos_out**2 + neg_out**2 + pos_out - neg_out
-            loss = loss.mean()
+            loss = (
+                pos_out**2 + neg_out**2 + neg_img_out**2
+                + 2*pos_out - neg_out - neg_img_out
+            ).mean()
             # Step
             optimizer.zero_grad()
             loss.backward()
@@ -214,7 +218,8 @@ def train_generator(model, data_loaders, args):
             )
             # Log image evolution
             writer.add_image(
-                'random_image_sample', back2color(unnormalize_imagenet_rgb(pos_samples[0], device)),
+                'random_image_sample',
+                back2color(unnormalize_imagenet_rgb(pos_samples[0], device)),
                 epoch * len(data_loaders['train']) + step
             )
             vid_to_write = torch.stack(neg_list, dim=0).unsqueeze(0)
@@ -234,6 +239,8 @@ def train_generator(model, data_loaders, args):
             },
             args.classifier_ckpnt
         )
+        print('\nValidation')
+        print(eval_generator(model, data_loaders['test'], args))
     return model
 
 
@@ -247,7 +254,7 @@ def eval_classifier(model, data_loader, args):
     pred = []
     cam = GradCAM(model=model, target_layer=model.layer4[-1], use_cuda=True if torch.cuda.is_available() else False)
     for step, ex in enumerate(data_loader):
-        images, _, emotions = ex
+        images, _, emotions, _ = ex
         pred.append(torch.sigmoid(model(images.to(device))).cpu().numpy())
         gt.append(emotions.cpu().numpy())
         kbar.update(step)
@@ -262,7 +269,7 @@ def eval_classifier(model, data_loader, args):
             heatmap = torch.from_numpy(np.float32(heatmap) / 255).to(device)
             rgb_cam_vis = heatmap + unnormalize_imagenet_rgb(images[0], device)
             rgb_cam_vis = rgb_cam_vis / torch.max(rgb_cam_vis)
-            self.writer.add_image(
+            writer.add_image(
                 'image_grad_cam_{}'.format(emo_id.item()), back2color(rgb_cam_vis),
                 step
             )
@@ -275,7 +282,22 @@ def eval_classifier(model, data_loader, args):
 @torch.no_grad()
 def eval_generator(model, data_loader, args):
     """Evaluate model on val/test data."""
-    pass
+    model.eval()
+    device = args.device
+    kbar = pkbar.Kbar(target=len(data_loader), width=25)
+    gt = 0
+    pred = 0
+    for step, ex in enumerate(data_loader):
+        images, _, _, neg_images = ex
+        # Compute energy
+        pos_out = model(images.to(device))
+        neg_img_out = model(neg_images.to(device))
+        gt += len(images)
+        pred += (pos_out < neg_img_out).sum()
+        kbar.update(step, [("acc", pred / gt)])
+
+    print(f"\nAccuracy: {pred / gt}")
+    return pred / gt
 
 
 def main():
@@ -310,7 +332,7 @@ def main():
     # Data loaders for classification
     data_loaders = {
         mode: DataLoader(
-            ArtEmisImageDataset(mode, args.im_path),
+            ArtEmisDataset(mode, args.im_path),
             batch_size=args.batch_size,
             shuffle=mode == 'train',
             drop_last=mode == 'train',
