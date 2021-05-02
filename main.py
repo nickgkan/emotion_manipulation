@@ -151,11 +151,11 @@ def train_classifier(model, data_loaders, args):
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict()
                 },
-                args.ckpnt
+                args.classifier_ckpnt
             )
             best_acc = acc
         else:  # load checkpoint to update epoch
-            checkpoint = torch.load(args.ckpnt)
+            checkpoint = torch.load(args.classifier_ckpnt)
             checkpoint["epoch"] += 1
             torch.save(checkpoint, args.ckpnt)
         scheduler.step()
