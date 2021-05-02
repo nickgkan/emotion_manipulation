@@ -37,13 +37,7 @@ class ResNetClassifier(nn.Module):
             nn.Linear(512, self.num_classes)
         )
 
-        if freeze_backbone:
-            # first set all to False
-            requires_grad(list(self.net.parameters()), False)
-
-            # set the last conv block and fc layer to True
-            requires_grad(list(self.net.layer4.parameters()), True)
-            requires_grad(list(self.net.fc.parameters()), True)
+        self.enable_grads()
 
     def forward(self, x):
         """Forward pass for an input image (B, 3, 224, 224)."""
@@ -53,3 +47,23 @@ class ResNetClassifier(nn.Module):
         """Override train to control batch-norm layers."""
         nn.Module.train(self, mode and not self.freeze_backbone)
         self.net.fc.train(mode=mode)
+
+    def enable_grads(self):
+        """Enable gradients for trainable modules."""
+        if self.freeze_backbone:
+            # first set all to False
+            requires_grad(list(self.net.parameters()), False)
+
+            # set the last conv block and fc layer to True
+            requires_grad(list(self.net.layer4.parameters()), True)
+            requires_grad(list(self.net.fc.parameters()), True)
+        else:
+            self.enable_all_grads()
+
+    def enable_all_grads(self):
+        """Enable gradients for all modules."""
+        requires_grad(list(self.net.parameters()), True)
+
+    def disable_all_grads(self):
+        """Disable gradients for all modules."""
+        requires_grad(list(self.net.parameters()), False)
