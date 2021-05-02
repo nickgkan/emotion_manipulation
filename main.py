@@ -289,6 +289,8 @@ def eval_classifier(model, data_loader, args, writer=None):
     AP = compute_ap(np.concatenate(gt), np.concatenate(pred))
 
     print(f"\nAccuracy: {np.mean(AP)}")
+    model.zero_grad()
+    model.disable_all_grads()
     return np.mean(AP)
 
 
