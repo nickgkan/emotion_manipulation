@@ -81,7 +81,7 @@ class ArtEmisDataset(Dataset):
         inds = self._sample_split_indices(len(imgs), split, seed)
         imgs = np.asarray(imgs)[inds].tolist()
         if self.emot_label is None:
-            return [annos[img] for img in imgs], None
+            return [annos[img] for img in imgs], [1]
         return (
             [
                 annos[img] for img in imgs
