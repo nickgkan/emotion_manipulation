@@ -82,7 +82,7 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
     # Detach samples
     neg_samples = neg_samples.detach()
     # Reactivate model gradients
-    requires_grad(list(model.fc.parameters()), True)
+    requires_grad(list(model.net.fc.parameters()), True)
     model.train()
     return neg_samples, negs
 
