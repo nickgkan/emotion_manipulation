@@ -42,11 +42,13 @@ def load_from_ckpnt(ckpnt, model, optimizer=None, scheduler=None):
     is_trained = False
     if osp.exists(ckpnt):
         checkpoint = torch.load(ckpnt)
+        is_trained = checkpoint.get("is_trained", False)
         model.load_state_dict(checkpoint["model_state_dict"])
+        if is_trained:
+            return model, optimizer, scheduler, start_epoch, is_trained 
         if optimizer is not None:
             optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         if scheduler is not None:
             scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
         start_epoch = checkpoint["epoch"]
-        is_trained = checkpoint.get("is_trained", False)
     return model, optimizer, scheduler, start_epoch, is_trained
