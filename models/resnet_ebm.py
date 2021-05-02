@@ -54,3 +54,23 @@ class ResNetEBM(nn.Module):
         """Override train to control batch-norm layers."""
         nn.Module.train(self, mode and not self.freeze_backbone)
         self.net.fc.train(mode=mode)
+
+    def enable_grads(self):
+        """Enable gradients for trainable modules."""
+        if self.freeze_backbone:
+            # first set all to False
+            requires_grad(list(self.net.parameters()), False)
+
+            # set the last conv block and fc layer to True
+            requires_grad(list(self.net.layer4.parameters()), True)
+            requires_grad(list(self.net.fc.parameters()), True)
+        else:
+            self.enable_all_grads()
+
+    def enable_all_grads(self):
+        """Enable gradients for all modules."""
+        requires_grad(list(self.net.parameters()), True)
+
+    def disable_all_grads(self):
+        """Disable gradients for all modules."""
+        requires_grad(list(self.net.parameters()), False)
