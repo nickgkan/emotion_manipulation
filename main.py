@@ -4,6 +4,7 @@ import argparse
 import os
 import os.path as osp
 
+import cv2
 import numpy as np
 import pkbar
 import torch
@@ -18,7 +19,6 @@ from metrics import compute_ap
 from models.resnet_classifier import ResNetClassifier, requires_grad
 from models.resnet_ebm import ResNetEBM
 from pytorch_grad_cam import GradCAM
-import cv2
 
 import ipdb
 st = ipdb.set_trace
@@ -285,10 +285,12 @@ def eval_classifier(model, data_loader, args, writer=None):
                 cv2.COLOR_BGR2RGB
             )
             heatmap = torch.from_numpy(np.float32(heatmap) / 255).to(device)
-            rgb_cam_vis = heatmap + unnormalize_imagenet_rgb(images[0], device)
+            rgb_img = unnormalize_imagenet_rgb(images[0], device)
+            rgb_cam_vis = heatmap + rgb_img.permute(2, 0, 1).continuous()
             rgb_cam_vis = rgb_cam_vis / torch.max(rgb_cam_vis)
             writer.add_image(
-                'image_grad_cam_{}'.format(emo_id.item()), back2color(rgb_cam_vis),
+                'image_grad_cam_{}'.format(emo_id.item()),
+                back2color(rgb_cam_vis),
                 step
             )
     AP = compute_ap(np.concatenate(gt), np.concatenate(pred))
