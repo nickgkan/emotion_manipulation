@@ -188,6 +188,7 @@ def train_generator(model, data_loaders, args):
         print("Epoch: %d/%d" % (epoch + 1, args.epochs))
         kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
         model.train()
+        model.enable_grads()
         for step, ex in enumerate(data_loaders['train']):
             images, _, emotions, neg_images = ex
             # positive samples
@@ -251,10 +252,10 @@ def train_generator(model, data_loaders, args):
     return model
 
 
-@torch.no_grad()
 def eval_classifier(model, data_loader, args, writer=None):
     """Evaluate model on val/test data."""
     model.eval()
+    model.enable_all_grads()
     device = args.device
     kbar = pkbar.Kbar(target=len(data_loader), width=25)
     gt = []
@@ -265,7 +266,9 @@ def eval_classifier(model, data_loader, args, writer=None):
     )
     for step, ex in enumerate(data_loader):
         images, _, emotions, _ = ex
-        pred.append(torch.sigmoid(model(images.to(device))).cpu().numpy())
+        images = images.to(device)
+        with torch.no_grad():
+            pred.append(torch.sigmoid(model(images)).cpu().numpy())
         gt.append(emotions.cpu().numpy())
         kbar.update(step)
         # Log
@@ -276,6 +279,7 @@ def eval_classifier(model, data_loader, args, writer=None):
         )
         for emo_id in torch.nonzero(emotions[0]).reshape(-1):
             grayscale_cam = cam(input_tensor=images[0:1], target_category=emo_id.item())
+            grayscale_cam = grayscale_cam[0]
             heatmap = cv2.cvtColor(
                 cv2.applyColorMap(np.uint8(255*grayscale_cam), cv2.COLORMAP_JET),
                 cv2.COLOR_BGR2RGB
