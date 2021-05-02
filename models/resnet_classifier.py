@@ -29,12 +29,15 @@ class ResNetClassifier(nn.Module):
         else:
             raise NotImplementedError
 
+        '''
         self.net.fc = nn.Sequential(
             nn.Linear(self.net.fc.in_features, 512),
             nn.ReLU(),
             nn.Dropout(0.2),
             nn.Linear(512, self.num_classes)
         )
+        '''
+        self.net.fc = nn.Linear(self.net.fc.in_features, self.num_classes)
 
         self.enable_grads()
 
