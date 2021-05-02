@@ -18,14 +18,16 @@ class ArtEmisDataset(Dataset):
         im_path (str): path to images
         seed (int): random seed for dataset splitting
         emot_label (str): emotion label to filter images
+        im_size (int): resized image dimension
     """
 
-    def __init__(self, split, im_path, seed=1184, emot_label=None):
+    def __init__(self, split, im_path, seed=1184, emot_label=None, im_size=64):
         """Initialize task-independent dataset."""
         super().__init__()
         self.split = split
         self.im_path = im_path
         self.emot_label = emot_label
+        self.im_size = im_size
         self.annos, self.neg_annos = self.load_annotations(split, seed)
         self.styles, self.emotions = self._get_classes()
 
@@ -113,17 +115,16 @@ class ArtEmisDataset(Dataset):
         _img = Image.open(img_name)
         width, height = _img.size
         max_wh = max(width, height)
-        assert min(width, height) == 224
         mean_ = [0.485, 0.456, 0.406]
         std_ = [0.229, 0.224, 0.225]
-        size = 224
+        size = self.im_size
         if self.split == 'train':
             preprocessing = transforms.Compose([
                 transforms.RandomHorizontalFlip(0.5),
                 transforms.RandomRotation(20),
                 transforms.RandomPerspective(0.1, 0.5),
                 transforms.Pad((0, 0, max_wh - width, max_wh - height)),
-                transforms.Resize((size + 16, size + 16)),
+                transforms.Resize((size + 8, size + 8)),
                 transforms.RandomCrop(size),
                 transforms.ToTensor(),
                 transforms.Normalize(mean_, std_),

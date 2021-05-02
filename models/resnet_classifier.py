@@ -42,7 +42,7 @@ class ResNetClassifier(nn.Module):
             requires_grad(list(self.net.parameters()), False)
 
             # set the last conv block and fc layer to True
-            # requires_grad(list(self.net.layer4.parameters()), True)
+            requires_grad(list(self.net.layer4.parameters()), True)
             requires_grad(list(self.net.fc.parameters()), True)
 
     def forward(self, x):

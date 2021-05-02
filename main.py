@@ -142,7 +142,7 @@ def train_classifier(model, data_loaders, args):
         )
         # Evaluation and model storing
         print("\nValidation")
-        acc = eval_classifier(model, data_loaders['test'], args)
+        acc = eval_classifier(model, data_loaders['test'], args, writer)
         writer.add_scalar('mAP', acc, epoch)
         improved, ret_epoch, keep_training = scheduler.step(acc)
         if ret_epoch < epoch:
@@ -250,14 +250,17 @@ def train_generator(model, data_loaders, args):
 
 
 @torch.no_grad()
-def eval_classifier(model, data_loader, args):
+def eval_classifier(model, data_loader, args, writer=None):
     """Evaluate model on val/test data."""
     model.eval()
     device = args.device
     kbar = pkbar.Kbar(target=len(data_loader), width=25)
     gt = []
     pred = []
-    cam = GradCAM(model=model, target_layer=model.layer4[-1], use_cuda=True if torch.cuda.is_available() else False)
+    cam = GradCAM(
+        model=model, target_layer=model.layer4[-1],
+        use_cuda=True if torch.cuda.is_available() else False
+    )
     for step, ex in enumerate(data_loader):
         images, _, emotions, _ = ex
         pred.append(torch.sigmoid(model(images.to(device))).cpu().numpy())
@@ -265,12 +268,16 @@ def eval_classifier(model, data_loader, args):
         kbar.update(step)
         # Log
         writer.add_image(
-            'image_sample', back2color(unnormalize_imagenet_rgb(images[0], device)),
+            'image_sample',
+            back2color(unnormalize_imagenet_rgb(images[0], device)),
             step
         )
         for emo_id in torch.nonzero(emotions[0]).reshape(-1):
             grayscale_cam = cam(input_tensor=images[0:1], target_category=emo_id.item())
-            heatmap = cv2.cvtColor(cv2.applyColorMap(np.uint8(255*grayscale_cam), cv2.COLORMAP_JET), cv2.COLOR_BGR2RGB)
+            heatmap = cv2.cvtColor(
+                cv2.applyColorMap(np.uint8(255*grayscale_cam), cv2.COLORMAP_JET),
+                cv2.COLOR_BGR2RGB
+            )
             heatmap = torch.from_numpy(np.float32(heatmap) / 255).to(device)
             rgb_cam_vis = heatmap + unnormalize_imagenet_rgb(images[0], device)
             rgb_cam_vis = rgb_cam_vis / torch.max(rgb_cam_vis)
@@ -338,7 +345,10 @@ def main():
     # Data loaders for classification
     data_loaders = {
         mode: DataLoader(
-            ArtEmisDataset(mode, args.im_path, emot_label=args.emot_label),
+            ArtEmisDataset(
+                mode, args.im_path, emot_label=args.emot_label,
+                im_size=224 if args.run_classifier else 64
+            ),
             batch_size=args.batch_size,
             shuffle=mode == 'train',
             drop_last=mode == 'train',
@@ -354,10 +364,10 @@ def main():
     if args.run_classifier:
         model = ResNetClassifier(
             num_classes=len(data_loaders['train'].dataset.emotions),
-            pretrained=True, freeze_backbone=True, layers=34
+            pretrained=True, freeze_backbone=True, layers=18
         )
         model = train_classifier(model.to(args.device), data_loaders, args)
-        eval_classifier(model.to(args.device), data_loaders['test'], args)
+        eval_classifier(model, data_loaders['test'], args, None)
 
     # Train generator
     if args.run_generator:
