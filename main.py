@@ -195,7 +195,7 @@ def train_generator(model, data_loaders, args):
                 model, torch.clone(neg_images.to(device)),
                 args.langevin_steps, args.langevin_step_size
             )
-            neg_img_samples, _ = langevin_updates(
+            neg_img_samples, neg_list = langevin_updates(
                 model, torch.randn_like(pos_samples).to(device),
                 args.langevin_steps, args.langevin_step_size
             )
@@ -226,6 +226,7 @@ def train_generator(model, data_loaders, args):
                 back2color(unnormalize_imagenet_rgb(pos_samples[0], device)),
                 epoch * len(data_loaders['train']) + step
             )
+            neg_list = [back2color(unnormalize_imagenet_rgb(neg, device)) for neg in neg_list]
             vid_to_write = torch.stack(neg_list, dim=0).unsqueeze(0)
             writer.add_video(
                 'ebm_evolution', vid_to_write, fps=args.ebm_log_fps,
