@@ -122,7 +122,6 @@ def train_classifier(model, data_loaders, args):
     # Training loop
     for epoch in range(start_epoch, args.epochs):
         print("Epoch: %d/%d" % (epoch + 1, args.epochs))
-        scheduler.step()
         kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
         model.train()
         for step, ex in enumerate(data_loaders['train']):
@@ -159,6 +158,7 @@ def train_classifier(model, data_loaders, args):
             checkpoint = torch.load(args.ckpnt)
             checkpoint["epoch"] += 1
             torch.save(checkpoint, args.ckpnt)
+        scheduler.step()
     # Test
     test_acc = eval_classifier(model, data_loaders['test'], args)
     print(f"Test Accuracy: {test_acc}")
