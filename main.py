@@ -71,7 +71,7 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
         neg_out.sum().backward()
         # Update neg_samples
         neg_samples.grad.data.clamp_(-0.01, 0.01)
-        neg_samples.data.add_(-langevin_lr, neg_samples.grad.data)
+        neg_samples.data.add_(neg_samples.grad.data, alpha=-langevin_lr)
         # Zero gradients
         neg_samples.grad.detach_()
         neg_samples.grad.zero_()
