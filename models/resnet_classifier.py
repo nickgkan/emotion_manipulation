@@ -31,7 +31,6 @@ class ResNetClassifier(nn.Module):
 
         self.net.fc = nn.Sequential(
             nn.Linear(self.net.fc.in_features, 512),
-            nn.BatchNorm1d(512),
             nn.ReLU(),
             nn.Dropout(0.2),
             nn.Linear(512, self.num_classes)
