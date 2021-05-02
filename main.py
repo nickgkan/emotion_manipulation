@@ -260,7 +260,7 @@ def eval_classifier(model, data_loader, args, writer=None):
     gt = []
     pred = []
     cam = GradCAM(
-        model=model, target_layer=model.layer4[-1],
+        model=model, target_layer=model.net.layer4[-1],
         use_cuda=True if torch.cuda.is_available() else False
     )
     for step, ex in enumerate(data_loader):
