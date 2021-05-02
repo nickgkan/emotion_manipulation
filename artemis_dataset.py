@@ -81,7 +81,7 @@ class ArtEmisDataset(Dataset):
         inds = self._sample_split_indices(len(imgs), split, seed)
         imgs = np.asarray(imgs)[inds].tolist()
         if self.emot_label is None:
-            return [annos[img] for img in imgs], [1]
+            return [annos[img] for img in imgs], None
         return (
             [
                 annos[img] for img in imgs
@@ -156,7 +156,7 @@ class ArtEmisDataset(Dataset):
         emotions = np.zeros((len(self.emotions),))
         emotions[list(map(self.emotions.get, anno['emotion']))] = 1
         # Bring a negative img if emotion is specified
-        neg_img = None
+        neg_img = [1]
         if self.neg_annos is not None:
             neg = self.neg_annos[np.random.randint(0, len(self.neg_annos) - 1)]
             neg_img = self._load_image("{0}/{1}.jpg".format(
