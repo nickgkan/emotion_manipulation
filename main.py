@@ -142,8 +142,6 @@ def train_classifier(model, data_loaders, args):
             'lr', optimizer.state_dict()['param_groups'][0]['lr'], epoch
         )
         # Evaluation and model storing
-        if epoch % 2 == 0:
-            continue
         print("\nValidation")
         acc = eval_classifier(model, data_loaders['test'], args, writer)
         writer.add_scalar('mAP', acc, epoch)
