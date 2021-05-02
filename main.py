@@ -10,11 +10,11 @@ import pkbar
 import torch
 from torch.nn import functional as F
 from torch.optim import Adam
+from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from artemis_dataset import ArtEmisDataset
-from early_stopping_scheduler import EarlyStopping
 from metrics import compute_ap
 from models.resnet_classifier import ResNetClassifier, requires_grad
 from models.resnet_ebm import ResNetEBM
@@ -109,19 +109,20 @@ def train_classifier(model, data_loaders, args):
     # Setup
     device = args.device
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
-    scheduler = EarlyStopping(
-        optimizer, factor=0.3, mode='max', max_decays=1, patience=3
+    model, optimizer, _, start_epoch, is_trained = load_from_ckpnt(
+        args.classifier_ckpnt, model, optimizer
     )
-    model, optimizer, scheduler, start_epoch, is_trained = load_from_ckpnt(
-        args.classifier_ckpnt, model, optimizer, scheduler
-    )
+    scheduler = MultiStepLR(optimizer, [3, 6, 9], gamma=0.3,
+                            last_epoch=start_epoch - 1)
     if is_trained:
         return model
     writer = SummaryWriter('runs/' + args.checkpoint.replace('.pt', ''))
+    best_acc = -1
 
     # Training loop
     for epoch in range(start_epoch, args.epochs):
         print("Epoch: %d/%d" % (epoch + 1, args.epochs))
+        scheduler.step()
         kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
         model.train()
         for step, ex in enumerate(data_loaders['train']):
@@ -146,26 +147,20 @@ def train_classifier(model, data_loaders, args):
         print("\nValidation")
         acc = eval_classifier(model, data_loaders['test'], args, writer)
         writer.add_scalar('mAP', acc, epoch)
-        improved, ret_epoch, keep_training = scheduler.step(acc)
-        if ret_epoch < epoch:
-            scheduler.reduce_lr()
-            checkpoint = torch.load(args.classifier_ckpnt)
-            model.load_state_dict(checkpoint["model_state_dict"])
-            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        # Load checkpoint to update scheduler and epoch
-        if osp.exists(args.classifier_ckpnt):
-            checkpoint = torch.load(args.classifier_ckpnt)
-        else:
-            checkpoint = {"epoch": 0}
-        checkpoint["scheduler_state_dict"] = scheduler.state_dict()
-        checkpoint["epoch"] += 1
-        checkpoint["is_trained"] = not keep_training
-        if improved:
-            checkpoint["model_state_dict"] = model.state_dict()
-            checkpoint["optimizer_state_dict"] = optimizer.state_dict()
-        torch.save(checkpoint, args.classifier_ckpnt)
-        if not keep_training:
-            break
+        if acc >= best_acc:
+            torch.save(
+                {
+                    "epoch": epoch + 1,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict()
+                },
+                args.ckpnt
+            )
+            best_acc = acc
+        else:  # load checkpoint to update epoch
+            checkpoint = torch.load(args.ckpnt)
+            checkpoint["epoch"] += 1
+            torch.save(checkpoint, args.ckpnt)
     # Test
     test_acc = eval_classifier(model, data_loaders['test'], args)
     print(f"Test Accuracy: {test_acc}")
