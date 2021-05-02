@@ -191,8 +191,11 @@ def train_generator(model, data_loaders, args):
             # positive samples
             pos_samples = images.to(device)
             # negative samples
-            neg_samples = torch.randn_like(pos_samples).to(device)
             neg_samples, neg_list = langevin_updates(
+                model, torch.clone(neg_images.to(device)),
+                args.langevin_steps, args.langevin_step_size
+            )
+            neg_img_samples, _ = langevin_updates(
                 model, torch.randn_like(pos_samples).to(device),
                 args.langevin_steps, args.langevin_step_size
             )
@@ -200,10 +203,11 @@ def train_generator(model, data_loaders, args):
             pos_out = model(pos_samples)
             neg_out = model(neg_samples)
             neg_img_out = model(neg_images.to(device))
+            neg_img_ld_out = model(neg_img_samples)
             # Loss
             loss = (
-                pos_out**2 + neg_out**2 + neg_img_out**2
-                + 2*pos_out - neg_out - neg_img_out
+                pos_out**2 + neg_out**2 + neg_img_out**2 + neg_img_ld_out**2
+                + 3*pos_out - neg_out - neg_img_out - neg_img_ld_out
             ).mean()
             # Step
             optimizer.zero_grad()
@@ -344,8 +348,8 @@ def main():
 
     # Train classifier
     # Emotion labels
-    #{'amusement': 0, 'anger': 1, 'awe': 2, 'contentment': 3, 'disgust': 4,
-    #'excitement': 5, 'fear': 6, 'sadness': 7, 'something else': 8}
+    # {'amusement': 0, 'anger': 1, 'awe': 2, 'contentment': 3, 'disgust': 4,
+    # 'excitement': 5, 'fear': 6, 'sadness': 7, 'something else': 8}
     if args.run_classifier:
         model = ResNetClassifier(
             num_classes=len(data_loaders['train'].dataset.emotions),
