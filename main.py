@@ -124,6 +124,7 @@ def train_classifier(model, data_loaders, args):
         print("Epoch: %d/%d" % (epoch + 1, args.epochs))
         kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
         model.train()
+        model.enable_grads()
         for step, ex in enumerate(data_loaders['train']):
             images, _, emotions, _ = ex
             logits = model(images.to(device))
