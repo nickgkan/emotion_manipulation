@@ -286,8 +286,8 @@ def eval_classifier(model, data_loader, args, writer=None):
             )
             heatmap = torch.from_numpy(np.float32(heatmap) / 255).to(device)
             rgb_img = unnormalize_imagenet_rgb(images[0], device)
-            rgb_cam_vis = heatmap + rgb_img.permute(2, 0, 1).continuous()
-            rgb_cam_vis = rgb_cam_vis / torch.max(rgb_cam_vis)
+            rgb_cam_vis = heatmap.permute(2, 0, 1).contiguous() + rgb_img
+            rgb_cam_vis = rgb_cam_vis / torch.max(rgb_cam_vis).item()
             writer.add_image(
                 'image_grad_cam_{}'.format(emo_id.item()),
                 back2color(rgb_cam_vis),

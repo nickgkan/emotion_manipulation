@@ -47,7 +47,7 @@ class ArtEmisDataset(Dataset):
                 }
                 for line in csv_reader
             ]
-        return annos[:256]
+        return annos
 
     def _get_classes(self):
         annos = self._read_from_csv()
