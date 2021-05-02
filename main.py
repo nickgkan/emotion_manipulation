@@ -157,7 +157,7 @@ def train_classifier(model, data_loaders, args):
         else:  # load checkpoint to update epoch
             checkpoint = torch.load(args.classifier_ckpnt)
             checkpoint["epoch"] += 1
-            torch.save(checkpoint, args.ckpnt)
+            torch.save(checkpoint, args.classifier_ckpnt)
         scheduler.step()
     # Test
     test_acc = eval_classifier(model, data_loaders['test'], args)
