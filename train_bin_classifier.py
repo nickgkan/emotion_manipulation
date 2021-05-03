@@ -8,7 +8,8 @@ import torch
 from torch.nn import functional as F
 from torch.optim import Adam
 from torch.optim.lr_scheduler import MultiStepLR
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.
+from tensorboardX import SummaryWriter
 
 from train_test_utils import (
     load_from_ckpnt, unnormalize_imagenet_rgb,
@@ -43,7 +44,7 @@ def train_bin_classifier(model, data_loaders, args):
                 torch.ones(len(images)), torch.zeros(len(images))
             )).to(device)
             images = torch.cat((images, neg_images))
-            logits = model(images.to(device))
+            logits = model(images.to(device)).squeeze(1)
             loss = F.binary_cross_entropy_with_logits(logits, labels)
             kbar.update(step, [("loss", loss)])
             optimizer.zero_grad()
@@ -101,7 +102,7 @@ def eval_bin_classifier(model, data_loader, args, writer=None):
         images = torch.cat((images, neg_images)).to(device)
         with torch.no_grad():
             pred += (
-                torch.sigmoid(model(images)).cpu().numpy() > 0.5
+                (torch.sigmoid(model(images)).squeeze(-1).cpu().numpy() > 0.5) * 1
                 == labels
             ).sum().item()
         gt += len(images)
