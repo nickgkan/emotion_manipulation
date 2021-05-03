@@ -13,6 +13,7 @@ from models.resnet_ebm import ResNetEBM
 from train_bin_classifier import train_bin_classifier, eval_bin_classifier
 from train_classifier import train_classifier, eval_classifier
 from train_generator import train_generator, eval_generator
+from torch.utils.tensorboard import SummaryWriter
 
 import ipdb
 st = ipdb.set_trace
@@ -59,7 +60,7 @@ def main():
             batch_size=args.batch_size,
             shuffle=mode == 'train',
             drop_last=mode == 'train',
-            num_workers=4
+            num_workers=0
         )
         for mode in ('train', 'test')
     }
@@ -71,10 +72,11 @@ def main():
     if args.run_classifier:
         model = ResNetClassifier(
             num_classes=len(data_loaders['train'].dataset.emotions),
-            pretrained=True, freeze_backbone=True, layers=18
+            pretrained=True, freeze_backbone=True, layers=34
         )
         model = train_classifier(model.to(args.device), data_loaders, args)
-        eval_classifier(model, data_loaders['test'], args, None)
+        eval_writer = SummaryWriter('runs/classifier_eval')
+        eval_classifier(model, data_loaders['test'], args, eval_writer)
 
     # Train binary classifier
     if args.run_bin_classifier:
@@ -83,7 +85,8 @@ def main():
             pretrained=True, freeze_backbone=True, layers=18
         )
         model = train_bin_classifier(model.to(args.device), data_loaders, args)
-        eval_bin_classifier(model, data_loaders['test'], args, None)
+        eval_writer = SummaryWriter('runs/bin_classifier_eval')
+        eval_bin_classifier(model, data_loaders['test'], args, eval_writer)
 
     # Train generator
     if args.run_generator:

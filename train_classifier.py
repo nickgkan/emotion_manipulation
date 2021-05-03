@@ -37,7 +37,7 @@ def train_classifier(model, data_loaders, args):
         print("Epoch: %d/%d" % (epoch + 1, args.epochs))
         kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
         model.train()
-        model.enable_grads()
+        #model.enable_grads()
         for step, ex in enumerate(data_loaders['train']):
             images, _, emotions, _ = ex
             logits = model(images.to(device))
@@ -55,34 +55,35 @@ def train_classifier(model, data_loaders, args):
             'lr', optimizer.state_dict()['param_groups'][0]['lr'], epoch
         )
         # Evaluation and model storing
-        print("\nValidation")
-        acc = eval_classifier(model, data_loaders['test'], args, writer)
-        writer.add_scalar('mAP', acc, epoch)
-        if acc >= best_acc:
-            torch.save(
-                {
-                    "epoch": epoch + 1,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict()
-                },
-                args.classifier_ckpnt
-            )
-            best_acc = acc
-        else:  # load checkpoint to update epoch
-            checkpoint = torch.load(args.classifier_ckpnt)
-            checkpoint["epoch"] += 1
-            torch.save(checkpoint, args.classifier_ckpnt)
+        if epoch % 5 == 0:
+            print("\nValidation")
+            acc = eval_classifier(model, data_loaders['test'], args, writer, epoch=epoch)
+            writer.add_scalar('mAP', acc, epoch)
+            if acc >= best_acc:
+                torch.save(
+                    {
+                        "epoch": epoch + 1,
+                        "model_state_dict": model.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict()
+                    },
+                    args.classifier_ckpnt
+                )
+                best_acc = acc
+            else:  # load checkpoint to update epoch
+                checkpoint = torch.load(args.classifier_ckpnt)
+                checkpoint["epoch"] += 1
+                torch.save(checkpoint, args.classifier_ckpnt)
         scheduler.step()
     # Test
-    test_acc = eval_classifier(model, data_loaders['test'], args)
+    test_acc = eval_classifier(model, data_loaders['test'], args, writer)
     print(f"Test Accuracy: {test_acc}")
     return model
 
 
-def eval_classifier(model, data_loader, args, writer=None):
+def eval_classifier(model, data_loader, args, writer=None, epoch=0):
     """Evaluate model on val/test data."""
     model.eval()
-    model.enable_all_grads()
+    #model.enable_all_grads()
     device = args.device
     kbar = pkbar.Kbar(target=len(data_loader), width=25)
     gt = []
@@ -94,22 +95,28 @@ def eval_classifier(model, data_loader, args, writer=None):
     for step, ex in enumerate(data_loader):
         images, _, emotions, _ = ex
         images = images.to(device)
-        with torch.no_grad():
-            pred.append(torch.sigmoid(model(images)).cpu().numpy())
+        pred.append(torch.sigmoid(model(images)).detach().cpu().numpy())
         gt.append(emotions.cpu().numpy())
         kbar.update(step)
         # Log
         writer.add_image(
             'image_sample',
             back2color(unnormalize_imagenet_rgb(images[0], device)),
-            step
+            epoch * len(data_loader) + step
         )
         for emo_id in torch.nonzero(emotions[0]).reshape(-1):
             grayscale_cam = cam(
                 input_tensor=images[0:1],
                 target_category=emo_id.item()
             )
-            grayscale_cam = grayscale_cam[0]
+            #grayscale_cam = grayscale_cam[0]
+            '''
+            writer.add_image(
+                'gray_grad_cam_{}'.format(emo_id.item()),
+                torch.from_numpy(np.uint8(255*grayscale_cam)).unsqueeze(0).repeat(3,1,1),
+                epoch * len(data_loader) + step
+            )
+            '''
             heatmap = cv2.cvtColor(
                 cv2.applyColorMap(np.uint8(255*grayscale_cam), cv2.COLORMAP_JET),
                 cv2.COLOR_BGR2RGB
@@ -121,11 +128,11 @@ def eval_classifier(model, data_loader, args, writer=None):
             writer.add_image(
                 'image_grad_cam_{}'.format(emo_id.item()),
                 back2color(rgb_cam_vis),
-                step
+                epoch * len(data_loader) + step
             )
     AP = compute_ap(np.concatenate(gt), np.concatenate(pred))
 
     print(f"\nAccuracy: {np.mean(AP)}")
-    model.zero_grad()
-    model.disable_all_grads()
+    #model.zero_grad()
+    #model.disable_all_grads()
     return np.mean(AP)
