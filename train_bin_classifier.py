@@ -88,10 +88,12 @@ def eval_bin_classifier(model, data_loader, args, writer=None):
     kbar = pkbar.Kbar(target=len(data_loader), width=25)
     gt = 0
     pred = 0
+    '''
     cam = GradCAM(
         model=model, target_layer=model.net.layer4[-1],
         use_cuda=True if torch.cuda.is_available() else False
     )
+    '''
     for step, ex in enumerate(data_loader):
         images, _, _, neg_images = ex
         labels = torch.cat((
@@ -108,6 +110,7 @@ def eval_bin_classifier(model, data_loader, args, writer=None):
         if step > 0:
             continue
         # Log
+        '''
         writer.add_image(
             'image_sample',
             back2color(unnormalize_imagenet_rgb(images[0], device)),
@@ -131,6 +134,7 @@ def eval_bin_classifier(model, data_loader, args, writer=None):
             back2color(rgb_cam_vis),
             step
         )
+        '''
 
     print(f"\nAccuracy: {pred / gt}")
     return pred / gt
