@@ -37,7 +37,6 @@ def train_bin_classifier(model, data_loaders, args):
         print("Epoch: %d/%d" % (epoch + 1, args.epochs))
         kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
         model.train()
-        model.enable_grads()
         for step, ex in enumerate(data_loaders['train']):
             images, _, _, neg_images = ex
             labels = torch.cat((
@@ -85,7 +84,6 @@ def train_bin_classifier(model, data_loaders, args):
 def eval_bin_classifier(model, data_loader, args, writer=None):
     """Evaluate model on val/test data."""
     model.eval()
-    model.enable_all_grads()
     device = args.device
     kbar = pkbar.Kbar(target=len(data_loader), width=25)
     gt = 0
@@ -135,6 +133,4 @@ def eval_bin_classifier(model, data_loader, args, writer=None):
         )
 
     print(f"\nAccuracy: {pred / gt}")
-    model.zero_grad()
-    model.disable_all_grads()
     return pred / gt
