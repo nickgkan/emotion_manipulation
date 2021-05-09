@@ -28,7 +28,7 @@ def unnormalize_imagenet_rgb(image, device):
     mean_ = torch.as_tensor([0.485, 0.456, 0.406]).reshape(3, 1, 1).to(device)
     std_ = torch.as_tensor([0.229, 0.224, 0.225]).reshape(3, 1, 1).to(device)
     image = (image * std_) + mean_
-    return image
+    return image.clamp(0,1)
 
 
 def back2color(image):

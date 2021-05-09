@@ -51,11 +51,12 @@ def train_classifier(model, data_loaders, args):
                 'loss', loss.item(),
                 epoch * len(data_loaders['train']) + step
             )
+            break
         writer.add_scalar(
             'lr', optimizer.state_dict()['param_groups'][0]['lr'], epoch
         )
         # Evaluation and model storing
-        if epoch % 5 == 0:
+        if epoch % 2 == 0:
             print("\nValidation")
             acc = eval_classifier(model, data_loaders['test'], args, writer, epoch=epoch)
             writer.add_scalar('mAP', acc, epoch)
@@ -101,12 +102,12 @@ def eval_classifier(model, data_loader, args, writer=None, epoch=0):
         # Log
         writer.add_image(
             'image_sample',
-            back2color(unnormalize_imagenet_rgb(images[0], device)),
+            back2color(unnormalize_imagenet_rgb(images[1], device)),
             epoch * len(data_loader) + step
         )
-        for emo_id in torch.nonzero(emotions[0]).reshape(-1):
+        for emo_id in torch.nonzero(emotions[1]).reshape(-1):
             grayscale_cam = cam(
-                input_tensor=images[0:1],
+                input_tensor=images[1:2],
                 target_category=emo_id.item()
             )
             #grayscale_cam = grayscale_cam[0]
@@ -122,7 +123,7 @@ def eval_classifier(model, data_loader, args, writer=None, epoch=0):
                 cv2.COLOR_BGR2RGB
             )
             heatmap = torch.from_numpy(np.float32(heatmap) / 255).to(device)
-            rgb_img = unnormalize_imagenet_rgb(images[0], device)
+            rgb_img = unnormalize_imagenet_rgb(images[1], device)
             rgb_cam_vis = heatmap.permute(2, 0, 1).contiguous() + rgb_img
             rgb_cam_vis = rgb_cam_vis / torch.max(rgb_cam_vis).item()
             writer.add_image(
@@ -133,6 +134,7 @@ def eval_classifier(model, data_loader, args, writer=None, epoch=0):
     AP = compute_ap(np.concatenate(gt), np.concatenate(pred))
 
     print(f"\nAccuracy: {np.mean(AP)}")
+    print(AP)
     #model.zero_grad()
     #model.disable_all_grads()
     return np.mean(AP)

@@ -1,11 +1,20 @@
+import torch
 import torch.nn as nn
-
 from torchvision import models
 
 
 def requires_grad(parameters, flag=True):
     for p in parameters:
         p.requires_grad = flag
+
+
+def deactivate_batchnorm(m):
+    if isinstance(m, nn.BatchNorm2d):
+        m.reset_parameters()
+        m.eval()
+        with torch.no_grad():
+            m.weight.fill_(1.0)
+            m.bias.zero_()
 
 
 class ResNetEBM(nn.Module):
@@ -74,3 +83,6 @@ class ResNetEBM(nn.Module):
     def disable_all_grads(self):
         """Disable gradients for all modules."""
         requires_grad(list(self.net.parameters()), False)
+
+    def disable_batchnorm(self):
+        self.net.apply(deactivate_batchnorm)

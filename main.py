@@ -91,7 +91,7 @@ def main():
     # Train generator
     if args.run_generator:
         model = ResNetEBM(
-            pretrained=True, freeze_backbone=True, layers=50
+            pretrained=False, freeze_backbone=False, layers=18
         )
         model = train_generator(model.to(args.device), data_loaders, args)
         eval_generator(model.to(args.device), data_loaders['test'], args)

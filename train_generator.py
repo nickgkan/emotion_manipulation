@@ -9,6 +9,9 @@ from train_test_utils import (
     load_from_ckpnt, clip_grad, back2color, unnormalize_imagenet_rgb
 )
 
+import ipdb
+st = ipdb.set_trace
+
 
 def train_generator(model, data_loaders, args):
     """Train an emotion EBM."""
@@ -26,7 +29,8 @@ def train_generator(model, data_loaders, args):
         print("Epoch: %d/%d" % (epoch + 1, args.epochs))
         kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
         model.train()
-        model.enable_grads()
+        model.disable_batchnorm()
+        # model.enable_grads()
         for step, ex in enumerate(data_loaders['train']):
             images, _, emotions, neg_images = ex
             # positive samples
@@ -46,10 +50,15 @@ def train_generator(model, data_loaders, args):
             neg_img_out = model(neg_images.to(device))
             neg_img_ld_out = model(neg_img_samples)
             # Loss
+            loss_reg = (pos_out**2 + neg_img_ld_out**2).mean()
+            loss_ml = pos_out.mean() - neg_img_ld_out.mean()
+            loss = loss_reg + loss_ml
+            '''
             loss = (
                 pos_out**2 + neg_out**2 + neg_img_out**2 + neg_img_ld_out**2
                 + 3*pos_out - neg_out - neg_img_out - neg_img_ld_out
             ).mean()
+             '''
             # Step
             optimizer.zero_grad()
             loss.backward()
@@ -62,6 +71,8 @@ def train_generator(model, data_loaders, args):
                 epoch * len(data_loaders['train']) + step
             )
             # Log image evolution
+            if step % 50 != 0:
+                continue
             writer.add_image(
                 'random_image_sample',
                 back2color(unnormalize_imagenet_rgb(pos_samples[0], device)),
@@ -117,8 +128,9 @@ def eval_generator(model, data_loader, args):
 def langevin_updates(model, neg_samples, nsteps, langevin_lr):
     """Apply nsteps iterations of Langevin dynamics on neg_samples."""
     # Deactivate model gradients
-    model.disable_all_grads()
+    # model.disable_all_grads()
     model.eval()
+    model.disable_batchnorm()
     # Activate samples gradients
     neg_samples.requires_grad = True
     noise = torch.randn_like(neg_samples).to(neg_samples.device)  # noise
@@ -126,8 +138,8 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
     negs = [torch.clone(neg_samples[0]).detach()]  # for visualization
     for k in range(nsteps):
         # Noise
-        noise.normal_(0, 0.005)
-        neg_samples.data.add_(noise.data)
+        #noise.normal_(0, 0.005)
+        #neg_samples.data.add_(noise.data)
         # Forward-backward
         neg_out = model(neg_samples)
         neg_out.sum().backward()
@@ -138,12 +150,13 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
         neg_samples.grad.detach_()
         neg_samples.grad.zero_()
         # Clamp
-        neg_samples.data.clamp(-0.485 / 0.224, (1 - 0.406) / 0.224)
+        neg_samples.data.clamp(-2.5, 2.5) # neg_samples.data.clamp(-0.485 / 0.229, (1 - 0.406) / 0.225)
         # Store intermediate results for visualization
         negs.append(torch.clone(neg_samples[0]).detach())
     # Detach samples
     neg_samples = neg_samples.detach()
     # Reactivate model gradients
-    model.enable_grads()
+    # model.enable_grads()
     model.train()
+    model.disable_batchnorm()
     return neg_samples, negs
