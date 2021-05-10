@@ -6,14 +6,14 @@ from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
 
 from train_test_utils import (
-    load_from_ckpnt, clip_grad, back2color, unnormalize_imagenet_rgb
+    load_from_ckpnt, clip_grad, back2color, unnormalize_imagenet_rgb, rand_mask
 )
 
 import ipdb
 st = ipdb.set_trace
 
 
-def train_generator(model, data_loaders, args):
+def train_manipulator(model, data_loaders, args):
     """Train an emotion EBM."""
     device = args.device
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
@@ -30,29 +30,28 @@ def train_generator(model, data_loaders, args):
         kbar = pkbar.Kbar(target=len(data_loaders['train']), width=25)
         model.train()
         model.disable_batchnorm()
-        model.enable_grads()
+        model.zero_grad()
+        # model.enable_grads()
         for step, ex in enumerate(data_loaders['train']):
             images, _, emotions, neg_images = ex
             # positive samples
             pos_samples = images.to(device)
+            # prepare negative samples
+            neg_samples, neg_masks = rand_mask(images.clone().to(device), device)
             # negative samples
-            neg_samples, neg_list = langevin_updates(
-                model, torch.clone(neg_images.to(device)),
-                args.langevin_steps, args.langevin_step_size
-            )
-            neg_img_samples, neg_list = langevin_updates(
-                model, torch.randn_like(pos_samples).to(device),
-                args.langevin_steps, args.langevin_step_size
+            neg_ld_samples, neg_list = langevin_updates(
+                model, torch.clone(neg_samples),
+                args.langevin_steps, args.langevin_step_size,
+                neg_masks
             )
             # Compute energy
             pos_out = model(pos_samples)
-            #neg_out = model(neg_samples)
-            #neg_img_out = model(neg_images.to(device))
-            neg_img_ld_out = model(neg_img_samples)
+            # neg_out = model(neg_samples)
+            neg_ld_out = model(neg_ld_samples.to(device))
             # Loss
-            loss_reg = (pos_out**2 + neg_img_ld_out**2).mean()
-            loss_ml = pos_out.mean() - neg_img_ld_out.mean()
-            loss = 0.3*loss_reg + loss_ml
+            loss_reg = (pos_out**2 + neg_ld_out**2).mean()
+            loss_ml = pos_out.mean() - neg_ld_out.mean()
+            loss = 0.2*loss_reg + loss_ml
             '''
             loss = (
                 pos_out**2 + neg_out**2 + neg_img_out**2 + neg_img_ld_out**2
@@ -67,7 +66,7 @@ def train_generator(model, data_loaders, args):
             kbar.update(step, [("loss", loss)])
             # Log loss
             writer.add_scalar('energy/energy_pos', pos_out.mean().item(), epoch * len(data_loaders['train']) + step)
-            writer.add_scalar('energy/energy_neg', neg_img_ld_out.mean().item(), epoch * len(data_loaders['train']) + step)
+            writer.add_scalar('energy/energy_neg', neg_ld_out.mean().item(), epoch * len(data_loaders['train']) + step)
             writer.add_scalar('loss/loss_reg', loss_reg.item(), epoch * len(data_loaders['train']) + step)
             writer.add_scalar('loss/loss_ml', loss_ml.item(), epoch * len(data_loaders['train']) + step)
             writer.add_scalar('loss/loss_total', loss.item(), epoch * len(data_loaders['train']) + step)
@@ -83,6 +82,7 @@ def train_generator(model, data_loaders, args):
                 back2color(unnormalize_imagenet_rgb(neg, device))
                 for neg in neg_list
             ]
+            neg_list = [torch.zeros_like(neg_list[0])] + neg_list
             vid_to_write = torch.stack(neg_list, dim=0).unsqueeze(0)
             writer.add_video(
                 'ebm_evolution', vid_to_write, fps=args.ebm_log_fps,
@@ -101,12 +101,12 @@ def train_generator(model, data_loaders, args):
             args.classifier_ckpnt
         )
         print('\nValidation')
-        print(eval_generator(model, data_loaders['test'], args))
+        print(eval_manipulator(model, data_loaders['test'], args))
     return model
 
 
 @torch.no_grad()
-def eval_generator(model, data_loader, args):
+def eval_manipulator(model, data_loader, args):
     """Evaluate model on val/test data."""
     model.eval()
     model.disable_batchnorm()
@@ -118,7 +118,9 @@ def eval_generator(model, data_loader, args):
         images, _, _, neg_images = ex
         # Compute energy
         pos_out = model(images.to(device))
-        neg_img_out = model(neg_images.to(device))
+        # negative samples
+        neg_samples, neg_masks = rand_mask(images.clone().to(device), device)
+        neg_img_out = model(neg_samples.to(device))
         gt += len(images)
         pred += (pos_out < neg_img_out).sum()
         kbar.update(step, [("acc", pred / gt)])
@@ -127,7 +129,7 @@ def eval_generator(model, data_loader, args):
     return pred / gt
 
 
-def langevin_updates(model, neg_samples, nsteps, langevin_lr):
+def langevin_updates(model, neg_samples, nsteps, langevin_lr, masks=None):
     """Apply nsteps iterations of Langevin dynamics on neg_samples."""
     # Deactivate model gradients
     model.disable_all_grads()
@@ -140,14 +142,17 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
     negs = [torch.clone(neg_samples[0]).detach()]  # for visualization
     for k in range(nsteps):
         # Noise
-        #noise.normal_(0, 0.005)
-        #neg_samples.data.add_(noise.data)
+        noise.normal_(0, 0.001)
+        neg_samples.data.add_(noise.data)
         # Forward-backward
         neg_out = model(neg_samples)
         neg_out.sum().backward()
         # Update neg_samples
         neg_samples.grad.data.clamp_(-0.01, 0.01)
-        neg_samples.data.add_(neg_samples.grad.data, alpha=-langevin_lr)
+        if masks is not None:
+            neg_samples.data.add_(neg_samples.grad.data * masks, alpha=-langevin_lr)
+        else:
+            neg_samples.data.add_(neg_samples.grad.data, alpha=-langevin_lr)
         # Zero gradients
         neg_samples.grad.detach_()
         neg_samples.grad.zero_()
@@ -162,3 +167,4 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
     model.train()
     model.disable_batchnorm()
     return neg_samples, negs
+

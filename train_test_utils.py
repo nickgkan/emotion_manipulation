@@ -1,7 +1,7 @@
 """Function common in training/testing of all models."""
 
 import os.path as osp
-
+import numpy as np
 import torch
 
 
@@ -52,3 +52,17 @@ def load_from_ckpnt(ckpnt, model, optimizer=None, scheduler=None):
             scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
         start_epoch = checkpoint["epoch"]
     return model, optimizer, scheduler, start_epoch, is_trained
+
+
+def rand_mask(image, device):
+    B, C, H, W = image.shape
+    crop_h = np.random.randint(int(H/4), int(3*H/4))
+    crop_w = np.random.randint(int(W/4), int(3*W/4))
+    crop_h_start = np.random.randint(H - crop_h)
+    crop_w_start = np.random.randint(W - crop_w)
+    crop_h_end = crop_h_start + crop_h
+    crop_w_end = crop_w_start + crop_w
+    masks = torch.zeros((B,1,H,W)).to(device)
+    masks[:,:,crop_h_start:crop_h_end+1,crop_w_start:crop_w_end+1] = 1
+    image[:,:,crop_h_start:crop_h_end+1,crop_w_start:crop_w_end+1] = torch.randn_like(image[:,:,crop_h_start:crop_h_end+1,crop_w_start:crop_w_end+1]).to(device)
+    return image, masks

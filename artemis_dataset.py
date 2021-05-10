@@ -131,14 +131,14 @@ class ArtEmisDataset(Dataset):
                 transforms.RandomErasing(p=0.2, scale=(0.02, 0.1))
             ])
             preprocessing = transforms.Compose([
-                transforms.Pad((0, 0, max_wh - width, max_wh - height)),
+                #transforms.Pad((0, 0, max_wh - width, max_wh - height)),
                 transforms.Resize((size, size)),
                 transforms.ToTensor(),
                 transforms.Normalize(mean_, std_)
             ])
         else:
             preprocessing = transforms.Compose([
-                transforms.Pad((0, 0, max_wh - width, max_wh - height)),
+                #transforms.Pad((0, 0, max_wh - width, max_wh - height)),
                 transforms.Resize((size, size)),
                 transforms.ToTensor(),
                 transforms.Normalize(mean_, std_)
@@ -151,7 +151,7 @@ class ArtEmisDataset(Dataset):
 
     def __getitem__(self, index):
         """Return a sample to form batch."""
-        index = 2
+        #index = 2
         anno = self.annos[index]
         # Load image
         img = self._load_image("{0}/{1}.jpg".format(
