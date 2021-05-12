@@ -184,6 +184,8 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
         trans_samples = random_brightness(trans_samples, brightness_params)
         trans_samples = random_contrast(trans_samples, contrast_params)
         trans_samples = random_saturation(trans_samples, saturation_params)
+        # Clamp
+        trans_samples.data.clamp_(-2.5, 2.5)
         # Forward-backward
         trans_out = model(trans_samples)
         trans_out.sum().backward()
@@ -209,8 +211,6 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
         linear_params_w.grad.zero_()
         linear_params_b.grad.detach_()
         linear_params_b.grad.zero_()
-        # Clamp
-        trans_samples.data.clamp_(-2.5, 2.5) # neg_samples.data.clamp(-0.485 / 0.229, (1 - 0.406) / 0.225)
         # Store intermediate results for visualization
         negs.append(torch.clone(trans_samples[0]).detach())
     # Detach samples
