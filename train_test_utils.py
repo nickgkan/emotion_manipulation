@@ -23,12 +23,20 @@ def clip_grad(parameters, optimizer):
             p.grad.data.copy_(torch.max(torch.min(p.grad.data, bound), -bound))
 
 
+def normalize_imagenet_rgb(image, device):
+    """Normalize rgb using imagenet stats."""
+    mean_ = torch.as_tensor([0.485, 0.456, 0.406]).reshape(3, 1, 1).to(device)
+    std_ = torch.as_tensor([0.229, 0.224, 0.225]).reshape(3, 1, 1).to(device)
+    image = (image - mean_) / std_
+    return image
+
+
 def unnormalize_imagenet_rgb(image, device):
     """Unnormalize normalized rgb using imagenet stats."""
     mean_ = torch.as_tensor([0.485, 0.456, 0.406]).reshape(3, 1, 1).to(device)
     std_ = torch.as_tensor([0.229, 0.224, 0.225]).reshape(3, 1, 1).to(device)
     image = (image * std_) + mean_
-    return image.clamp(0,1)
+    return image.clamp(0, 1)
 
 
 def back2color(image):
@@ -45,7 +53,7 @@ def load_from_ckpnt(ckpnt, model, optimizer=None, scheduler=None):
         is_trained = checkpoint.get("is_trained", False)
         model.load_state_dict(checkpoint["model_state_dict"])
         if is_trained:
-            return model, optimizer, scheduler, start_epoch, is_trained 
+            return model, optimizer, scheduler, start_epoch, is_trained
         if optimizer is not None:
             optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         if scheduler is not None:
@@ -105,5 +113,3 @@ def rand_augment(image):
     image = random_saturation(image, saturation_params)
 
     return image
-
-

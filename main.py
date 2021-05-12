@@ -111,7 +111,7 @@ def main():
     # Train transformations
     if args.run_transformations:
         model = ResNetEBM(
-            pretrained=False, freeze_backbone=False, layers=18
+            pretrained=True, freeze_backbone=False, layers=18
         )
         model = train_transformations(model.to(args.device), data_loaders, args)
         eval_transformations(model.to(args.device), data_loaders['test'], args)

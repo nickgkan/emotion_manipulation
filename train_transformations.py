@@ -6,8 +6,9 @@ from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
 
 from train_test_utils import (
-    load_from_ckpnt, clip_grad, back2color, unnormalize_imagenet_rgb, 
-    random_brightness, random_contrast, random_saturation, random_linear, rand_augment
+    load_from_ckpnt, clip_grad, back2color, normalize_imagenet_rgb,
+    random_brightness, random_contrast,
+    random_saturation, random_linear, rand_augment
 )
 
 import ipdb
@@ -185,9 +186,9 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
         trans_samples = random_contrast(trans_samples, contrast_params)
         trans_samples = random_saturation(trans_samples, saturation_params)
         # Clamp
-        trans_samples.data.clamp_(-2.5, 2.5)
+        trans_samples.data.clamp_(0, 1)
         # Forward-backward
-        trans_out = model(trans_samples)
+        trans_out = model(normalize_imagenet_rgb(trans_samples))
         trans_out.sum().backward()
         # Update transform params
         brightness_params.grad.data.clamp_(-0.01, 0.01)
