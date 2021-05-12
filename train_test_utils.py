@@ -27,6 +27,9 @@ def normalize_imagenet_rgb(image, device):
     """Normalize rgb using imagenet stats."""
     mean_ = torch.as_tensor([0.485, 0.456, 0.406]).reshape(3, 1, 1).to(device)
     std_ = torch.as_tensor([0.229, 0.224, 0.225]).reshape(3, 1, 1).to(device)
+    if len(image.shape) == 4:
+        mean_ = mean_.unsqueeze(0)
+        std_ = std_.unsqueeze(0)
     image = (image - mean_) / std_
     return image
 
