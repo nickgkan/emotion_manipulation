@@ -51,7 +51,7 @@ def train_manipulator(model, data_loaders, args):
             # Loss
             loss_reg = (pos_out**2 + neg_ld_out**2).mean()
             loss_ml = pos_out.mean() - neg_ld_out.mean()
-            loss = 0.2*loss_reg + loss_ml
+            loss = 0.5*loss_reg + loss_ml
             '''
             loss = (
                 pos_out**2 + neg_out**2 + neg_img_out**2 + neg_img_ld_out**2

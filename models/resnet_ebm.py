@@ -39,7 +39,7 @@ class ResNetEBM(nn.Module):
             nn.Linear(self.net.fc.in_features, 256),
             nn.LeakyReLU(),
             nn.Linear(256, 1),
-            nn.Sigmoid()
+            #nn.Sigmoid()
         )
 
         if freeze_backbone:
