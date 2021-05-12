@@ -1,4 +1,4 @@
-"""Main utilities for generation on ArtEmis."""
+"""Train Manipulator / Inpainter"""
 
 import pkbar
 import torch
@@ -46,12 +46,16 @@ def train_manipulator(model, data_loaders, args):
             )
             # Compute energy
             pos_out = model(pos_samples)
-            # neg_out = model(neg_samples)
+            neg_img_out = model(neg_images.to(device))
             neg_ld_out = model(neg_ld_samples.to(device))
             # Loss
-            loss_reg = (pos_out**2 + neg_ld_out**2).mean()
-            loss_ml = pos_out.mean() - neg_ld_out.mean()
+            loss_reg = (pos_out**2 + neg_ld_out**2 + neg_img_out**2).mean()
+            # loss_reg = (torch.abs(pos_out) + torch.abs(neg_ld_out) + torch.abs(neg_img_out)).mean()
+            loss_ml = 2*pos_out.mean() - neg_ld_out.mean() - neg_img_out.mean()
+            coeff = loss_ml.detach().clone() / loss_reg.detach().clone()
             loss = 0.5*loss_reg + loss_ml
+            # if epoch == 0:
+            #     loss = loss * 0.05
             '''
             loss = (
                 pos_out**2 + neg_out**2 + neg_img_out**2 + neg_img_ld_out**2
@@ -100,6 +104,14 @@ def train_manipulator(model, data_loaders, args):
             },
             args.classifier_ckpnt
         )
+        torch.save(
+            {
+                "epoch": epoch + 1,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict()
+            },
+            "manipulator_%02d.pt" % (epoch+1)
+        )
         print('\nValidation')
         print(eval_manipulator(model, data_loaders['test'], args))
     return model
@@ -142,7 +154,7 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr, masks=None):
     negs = [torch.clone(neg_samples[0]).detach()]  # for visualization
     for k in range(nsteps):
         # Noise
-        noise.normal_(0, 0.001)
+        noise.normal_(0, 0.005)
         neg_samples.data.add_(noise.data)
         # Forward-backward
         neg_out = model(neg_samples)
@@ -167,4 +179,3 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr, masks=None):
     model.train()
     model.disable_batchnorm()
     return neg_samples, negs
-

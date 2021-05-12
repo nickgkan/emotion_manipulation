@@ -57,7 +57,7 @@ def main():
         mode: DataLoader(
             ArtEmisDataset(
                 mode, args.im_path, emot_label=args.emot_label,
-                im_size=32 if args.run_generator or args.run_manipulator else 224
+                im_size=64 if args.run_generator or args.run_manipulator else 224
             ),
             batch_size=args.batch_size,
             shuffle=mode == 'train',
@@ -100,7 +100,7 @@ def main():
 
     if args.run_manipulator:
         model = ResNetEBM(
-            pretrained=False, freeze_backbone=False, layers=18
+            pretrained=False, freeze_backbone=False, layers=34
         )
         model = train_manipulator(model.to(args.device), data_loaders, args)
         eval_manipulator(model.to(args.device), data_loaders['test'], args)
