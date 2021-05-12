@@ -67,27 +67,43 @@ def rand_mask(image, device):
     image[:,:,crop_h_start:crop_h_end+1,crop_w_start:crop_w_end+1] = torch.randn_like(image[:,:,crop_h_start:crop_h_end+1,crop_w_start:crop_w_end+1]).to(device)
     return image, masks
 
-def RandomBrightness(image, coeff):
+def random_brightness(image, coeff):
     # coeff: (B,)
     B, _, H, W = image.shape
     return (image * coeff.reshape(B, 1, 1, 1)).clamp(0, 1)
 
-def RandomContrast(image, coeff):
+def random_contrast(image, coeff):
     # coeff: (B,)
     B, _, H, W = image.shape
-    return (coeff * image + (1 - coeff.reshape(B, 1, 1, 1)) * image.mean()).clamp(0,1)
+    return (coeff.reshape(B, 1, 1, 1) * image + (1 - coeff.reshape(B, 1, 1, 1)) * image.mean()).clamp(0,1)
 
-def RandomSaturation(image, coeff):
+def random_saturation(image, coeff):
     # coeff: (B,)
     B, _, H, W = image.shape
     grayscale_vec = torch.as_tensor([0.299, 0.587, 0.114]).reshape(1, 3, 1, 1).float().cuda()
-    return (coeff * image + (1 - coeff.reshape(B, 1, 1, 1)) * (grayscale_vec * image).sum(1).unsqueeze(1)).clamp(0, 1)
+    return (coeff.reshape(B, 1, 1, 1) * image + (1 - coeff.reshape(B, 1, 1, 1)) * (grayscale_vec * image).sum(1).unsqueeze(1)).clamp(0, 1)
 
-def RandomLinear(image, w, b):
+def random_linear(image, w, b):
     # image: (B, 3, 64, 64)
     # w: (B, 3, 3)
     # b: (B, 3)
     B, _, H, W = image.shape
     return torch.bmm(w, image.reshape(B, 3, -1)).reshape(B, 3, H, W) + b.reshape(B, 3, 1, 1)
+
+def rand_augment(image):
+    # image: (B, 3, 64, 64)
+    B, _, H, W = image.shape
+    brightness_params = (torch.ones((B)).float() * 0.8 + torch.rand(B) * 0.4).to(image.device)
+    contrast_params = (torch.ones((B)).float() * 0.8 + torch.rand(B) * 0.4).to(image.device)
+    saturation_params = (torch.ones((B)).float() * 0.8 + torch.rand(B) * 0.4).to(image.device)
+    linear_params_w = (torch.eye(3).unsqueeze(0).repeat(B,1,1) * 0.9 + torch.rand((B,3,3)) * 0.2).to(image.device)
+    linear_params_b = (torch.zeros((B, 3)).float() * -0.1 + torch.rand((B,3)) * 0.2).to(image.device)
+
+    image = random_linear(image, linear_params_w, linear_params_b)
+    image = random_brightness(image, brightness_params)
+    image = random_contrast(image, contrast_params)
+    image = random_saturation(image, saturation_params)
+
+    return image
 
 

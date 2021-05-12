@@ -14,6 +14,7 @@ from train_bin_classifier import train_bin_classifier, eval_bin_classifier
 from train_classifier import train_classifier, eval_classifier
 from train_generator import train_generator, eval_generator
 from train_manipulator import train_manipulator, eval_manipulator
+from train_transformations import train_transformations, eval_transformations
 from torch.utils.tensorboard import SummaryWriter
 
 import ipdb
@@ -46,6 +47,7 @@ def main():
     argparser.add_argument("--run_classifier", action='store_true')
     argparser.add_argument("--run_generator", action='store_true')
     argparser.add_argument("--run_manipulator", action='store_true')
+    argparser.add_argument("--run_transformations", action='store_true')
     argparser.add_argument("--emot_label", default=None)
     args = argparser.parse_args()
     args.classifier_ckpnt = osp.join(args.checkpoint_path, args.checkpoint)
@@ -57,7 +59,7 @@ def main():
         mode: DataLoader(
             ArtEmisDataset(
                 mode, args.im_path, emot_label=args.emot_label,
-                im_size=64 if args.run_generator or args.run_manipulator else 224
+                im_size=224 if args.run_classifier else 64
             ),
             batch_size=args.batch_size,
             shuffle=mode == 'train',
@@ -98,12 +100,21 @@ def main():
         model = train_generator(model.to(args.device), data_loaders, args)
         eval_generator(model.to(args.device), data_loaders['test'], args)
 
+    # Train manipulator
     if args.run_manipulator:
         model = ResNetEBM(
             pretrained=False, freeze_backbone=False, layers=34
         )
         model = train_manipulator(model.to(args.device), data_loaders, args)
         eval_manipulator(model.to(args.device), data_loaders['test'], args)
+
+    # Train transformations
+    if args.run_transformations:
+        model = ResNetEBM(
+            pretrained=False, freeze_backbone=False, layers=18
+        )
+        model = train_transformations(model.to(args.device), data_loaders, args)
+        eval_transformations(model.to(args.device), data_loaders['test'], args)
 
 
 if __name__ == "__main__":

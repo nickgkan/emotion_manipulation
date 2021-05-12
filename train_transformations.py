@@ -6,8 +6,8 @@ from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
 
 from train_test_utils import (
-    load_from_ckpnt, clip_grad, back2color, unnormalize_imagenet_rgb, RandomBrightness,
-    RandomContrast, RandomSaturation, RandomLinear
+    load_from_ckpnt, clip_grad, back2color, unnormalize_imagenet_rgb, 
+    random_brightness, random_contrast, random_saturation, random_linear, rand_augment
 )
 
 import ipdb
@@ -38,12 +38,11 @@ def train_transformations(model, data_loaders, args):
             # positive samples
             pos_samples = images.to(device)
             # prepare negative samples
-            neg_samples, neg_masks = rand_mask(images.clone().to(device), device)
+            neg_samples = rand_augment(images.clone().to(device))
             # negative samples
             neg_ld_samples, neg_list = langevin_updates(
                 model, torch.clone(neg_samples),
                 args.langevin_steps, args.langevin_step_size,
-                neg_masks
             )
             # Compute energy
             pos_out = model(pos_samples)
@@ -79,12 +78,22 @@ def train_transformations(model, data_loaders, args):
             if step % 50 != 0:
                 continue
             writer.add_image(
-                'random_image_sample',
-                back2color(unnormalize_imagenet_rgb(pos_samples[0], device)),
+                'ld/random_image_sample',
+                back2color(pos_samples[0]),
+                epoch * len(data_loaders['train']) + step
+            )
+            writer.add_image(
+                'ld/ld_start',
+                back2color(neg_list[0]),
+                epoch * len(data_loaders['train']) + step
+            )
+            writer.add_image(
+                'ld/ld_end',
+                back2color(neg_list[-1]),
                 epoch * len(data_loaders['train']) + step
             )
             neg_list = [
-                back2color(unnormalize_imagenet_rgb(neg, device))
+                back2color(neg)
                 for neg in neg_list
             ]
             neg_list = [torch.zeros_like(neg_list[0])] + neg_list
@@ -132,7 +141,7 @@ def eval_transformations(model, data_loader, args):
         # Compute energy
         pos_out = model(images.to(device))
         # negative samples
-        neg_samples, neg_masks = rand_mask(images.clone().to(device), device)
+        neg_samples = rand_augment(images.clone().to(device))
         neg_img_out = model(neg_samples.to(device))
         gt += len(images)
         pred += (pos_out < neg_img_out).sum()
@@ -171,10 +180,10 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
         #neg_samples.data.add_(noise.data)
         # transformations
         trans_samples = neg_samples.clone()
-        trans_samples = RandomLinear(trans_samples, linear_params_w, linear_params_b)
-        trans_samples = RandomBrightness(trans_samples, brightness_params)
-        trans_samples = RandomContrast(trans_samples, contrast_params)
-        trans_samples = RandomSaturation(trans_samples, saturation_params)
+        trans_samples = random_linear(trans_samples, linear_params_w, linear_params_b)
+        trans_samples = random_brightness(trans_samples, brightness_params)
+        trans_samples = random_contrast(trans_samples, contrast_params)
+        trans_samples = random_saturation(trans_samples, saturation_params)
         # Forward-backward
         trans_out = model(trans_samples)
         trans_out.sum().backward()
