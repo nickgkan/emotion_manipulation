@@ -132,7 +132,10 @@ class ArtEmisDataset(Dataset):
             ])
             preprocessing = transforms.Compose([
                 #transforms.Pad((0, 0, max_wh - width, max_wh - height)),
-                transforms.Resize((size, size)),
+                transforms.RandomHorizontalFlip(0.5),
+                transforms.RandomRotation(3),
+                transforms.Resize((size+3, size+3)),
+                transforms.RandomCrop(size),
                 transforms.ToTensor(),
                 transforms.Normalize(mean_, std_)
             ])
