@@ -6,9 +6,8 @@ from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
 
 from train_test_utils import (
-    load_from_ckpnt, clip_grad, back2color, normalize_imagenet_rgb,
-    random_brightness, random_contrast,
-    random_saturation, random_linear, rand_augment
+    load_from_ckpnt, clip_grad, back2color, unnormalize_imagenet_rgb, normalize_imagenet_rgb,
+    random_brightness, random_contrast, random_saturation, random_linear, rand_augment
 )
 
 import ipdb
@@ -46,9 +45,9 @@ def train_transformations(model, data_loaders, args):
                 args.langevin_steps, args.langevin_step_size,
             )
             # Compute energy
-            pos_out = model(pos_samples)
-            neg_img_out = model(neg_images.to(device))
-            neg_ld_out = model(neg_ld_samples.to(device))
+            pos_out = model(normalize_imagenet_rgb(pos_samples))
+            neg_img_out = model(normalize_imagenet_rgb(neg_images.to(device)))
+            neg_ld_out = model(normalize_imagenet_rgb(neg_ld_samples.to(device)))
             # Loss
             loss_reg = (pos_out**2 + neg_ld_out**2 + neg_img_out**2).mean()
             # loss_reg = (torch.abs(pos_out) + torch.abs(neg_ld_out) + torch.abs(neg_img_out)).mean()
@@ -140,10 +139,10 @@ def eval_transformations(model, data_loader, args):
     for step, ex in enumerate(data_loader):
         images, _, _, neg_images = ex
         # Compute energy
-        pos_out = model(images.to(device))
+        pos_out = model(normalize_imagenet_rgb(images.to(device)))
         # negative samples
         neg_samples = rand_augment(images.clone().to(device))
-        neg_img_out = model(neg_samples.to(device))
+        neg_img_out = model(normalize_imagenet_rgb(neg_samples.to(device)))
         gt += len(images)
         pred += (pos_out < neg_img_out).sum()
         kbar.update(step, [("acc", pred / gt)])
@@ -186,7 +185,7 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
         trans_samples = random_contrast(trans_samples, contrast_params)
         trans_samples = random_saturation(trans_samples, saturation_params)
         # Clamp
-        trans_samples.data.clamp_(0, 1)
+        trans_samples.data.clamp_(-2.5, 2.5)
         # Forward-backward
         trans_out = model(normalize_imagenet_rgb(trans_samples))
         trans_out.sum().backward()
@@ -197,10 +196,10 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
         contrast_params.data.add_(contrast_params.grad.data, alpha=-langevin_lr)
         saturation_params.grad.data.clamp_(-0.01, 0.01)
         saturation_params.data.add_(saturation_params.grad.data, alpha=-langevin_lr)
-        linear_params_w.grad.data.clamp_(-0.01, 0.01)
-        linear_params_w.data.add_(linear_params_w.grad.data, alpha=-langevin_lr)
-        linear_params_b.grad.data.clamp_(-0.01, 0.01)
-        linear_params_b.data.add_(linear_params_b.grad.data, alpha=-langevin_lr)
+        #linear_params_w.grad.data.clamp_(-0.01, 0.01)
+        #linear_params_w.data.add_(linear_params_w.grad.data, alpha=-langevin_lr)
+        #linear_params_b.grad.data.clamp_(-0.01, 0.01)
+        #linear_params_b.data.add_(linear_params_b.grad.data, alpha=-langevin_lr)
         # Zero gradients
         brightness_params.grad.detach_()
         brightness_params.grad.zero_()
@@ -208,10 +207,10 @@ def langevin_updates(model, neg_samples, nsteps, langevin_lr):
         contrast_params.grad.zero_()
         saturation_params.grad.detach_()
         saturation_params.grad.zero_()
-        linear_params_w.grad.detach_()
-        linear_params_w.grad.zero_()
-        linear_params_b.grad.detach_()
-        linear_params_b.grad.zero_()
+        #linear_params_w.grad.detach_()
+        #linear_params_w.grad.zero_()
+        #linear_params_b.grad.detach_()
+        #linear_params_b.grad.zero_()
         # Store intermediate results for visualization
         negs.append(torch.clone(trans_samples[0]).detach())
     # Detach samples

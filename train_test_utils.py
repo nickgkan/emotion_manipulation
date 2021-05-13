@@ -23,10 +23,10 @@ def clip_grad(parameters, optimizer):
             p.grad.data.copy_(torch.max(torch.min(p.grad.data, bound), -bound))
 
 
-def normalize_imagenet_rgb(image, device):
+def normalize_imagenet_rgb(image):
     """Normalize rgb using imagenet stats."""
-    mean_ = torch.as_tensor([0.485, 0.456, 0.406]).reshape(3, 1, 1).to(device)
-    std_ = torch.as_tensor([0.229, 0.224, 0.225]).reshape(3, 1, 1).to(device)
+    mean_ = torch.as_tensor([0.485, 0.456, 0.406]).reshape(3, 1, 1).to(image.device)
+    std_ = torch.as_tensor([0.229, 0.224, 0.225]).reshape(3, 1, 1).to(image.device)
     if len(image.shape) == 4:
         mean_ = mean_.unsqueeze(0)
         std_ = std_.unsqueeze(0)
@@ -34,10 +34,10 @@ def normalize_imagenet_rgb(image, device):
     return image
 
 
-def unnormalize_imagenet_rgb(image, device):
+def unnormalize_imagenet_rgb(image):
     """Unnormalize normalized rgb using imagenet stats."""
-    mean_ = torch.as_tensor([0.485, 0.456, 0.406]).reshape(3, 1, 1).to(device)
-    std_ = torch.as_tensor([0.229, 0.224, 0.225]).reshape(3, 1, 1).to(device)
+    mean_ = torch.as_tensor([0.485, 0.456, 0.406]).reshape(3, 1, 1).to(image.device)
+    std_ = torch.as_tensor([0.229, 0.224, 0.225]).reshape(3, 1, 1).to(image.device)
     image = (image * std_) + mean_
     return image.clamp(0, 1)
 
