@@ -137,7 +137,7 @@ class ArtEmisDataset(Dataset):
                 transforms.Resize((size+3, size+3)),
                 transforms.RandomCrop(size),
                 transforms.ToTensor(),
-                #transforms.Normalize(mean_, std_)
+                transforms.Normalize(mean_, std_)
             ])
         else:
             preprocessing = transforms.Compose([

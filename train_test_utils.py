@@ -46,6 +46,13 @@ def back2color(image):
     """Convert tensor in [0, 1] to color ByteTensor."""
     return (image*255).type(torch.ByteTensor)
 
+def rgb_to_grayscale(image):
+    if len(image.shape) == 3:
+        image = (image.sum(0) / 3).unsqueeze(0).repeat(3,1,1)
+    else:
+        image = (image.sum(1) / 3).unsqueeze(1).repeat(1,3,1,1)
+    return image
+
 
 def load_from_ckpnt(ckpnt, model, optimizer=None, scheduler=None):
     """Load trained parameters from given checkpoint."""

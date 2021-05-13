@@ -15,6 +15,7 @@ from train_classifier import train_classifier, eval_classifier
 from train_generator import train_generator, eval_generator
 from train_manipulator import train_manipulator, eval_manipulator
 from train_transformations import train_transformations, eval_transformations
+from train_colorizer import train_colorizer, eval_colorizer
 from torch.utils.tensorboard import SummaryWriter
 
 import ipdb
@@ -48,6 +49,7 @@ def main():
     argparser.add_argument("--run_generator", action='store_true')
     argparser.add_argument("--run_manipulator", action='store_true')
     argparser.add_argument("--run_transformations", action='store_true')
+    argparser.add_argument("--run_colorizer", action='store_true')
     argparser.add_argument("--emot_label", default=None)
     args = argparser.parse_args()
     args.classifier_ckpnt = osp.join(args.checkpoint_path, args.checkpoint)
@@ -115,6 +117,14 @@ def main():
         )
         model = train_transformations(model.to(args.device), data_loaders, args)
         eval_transformations(model.to(args.device), data_loaders['test'], args)
+
+    # Train colorizer
+    if args.run_colorizer:
+        model = ResNetEBM(
+            pretrained=True, freeze_backbone=False, layers=18
+        )
+        model = train_colorizer(model.to(args.device), data_loaders, args)
+        eval_colorizer(model.to(args.device), data_loaders['test'], args)
 
 
 if __name__ == "__main__":
